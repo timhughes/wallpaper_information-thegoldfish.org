@@ -1,0 +1,9 @@
+{
+    "description": "Runs a command and displays the output overlayed on the desktop of the primary monitor",
+    "name": "Wallpaper Information",
+    "shell-version": [
+        "3.32",
+        "3.34"
+    ],
+    "uuid": "wallpaper_information@thegoldfish.org"
+}

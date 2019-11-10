@@ -1,0 +1,9 @@
+
+.infobox-label {
+    font-size: 24px;
+    font-weight: bold;
+    color: #ffffff;
+    background-color: rgba(10,10,10,0.5);
+    border-radius: 10px;
+    padding: .5em;
+}
