@@ -123,12 +123,12 @@ Mainloop.timeout_add(1000, _update_infobox);  // 1000 = 1 second
 ### Extension not showing up
 - Make sure the extension directory is named exactly `wallpaper_information@thegoldfish.org`
 - Check that you have the correct GNOME Shell version (3.32 or 3.34)
-- Look for errors in the GNOME Shell log: `journalctl -f /usr/bin/gnome-shell`
+- Look for errors in the GNOME Shell log: `journalctl -f -u gnome-shell`
 
 ### No output displayed
 - Verify that the `facter` command is installed and works from terminal
 - Check that the command in `extension.js` runs successfully from command line
-- Look for JavaScript errors: `journalctl -f /usr/bin/gnome-shell -o cat | grep wallpaper`
+- Look for JavaScript errors: `journalctl -f -u gnome-shell -o cat | grep wallpaper`
 
 ### Wrong position or styling
 - Modify the values in `extension.js` (position) or `stylesheet.css` (appearance)
