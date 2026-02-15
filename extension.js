@@ -12,6 +12,11 @@ import Clutter from 'gi://Clutter';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
+// Constants
+const FALLBACK_WIDTH = 200;  // Fallback width if dimension calculation fails
+const FALLBACK_HEIGHT = 100;  // Fallback height if dimension calculation fails
+const POSITION_MARGIN = 48;  // Margin from screen edges
+
 // Get system information using native APIs
 function getSystemInfo() {
     let info = {};
@@ -203,7 +208,6 @@ export default class WallpaperInfoExtension extends Extension {
         const verticalPos = this._settings.get_string('position-vertical');
         const horizontalPos = this._settings.get_string('position-horizontal');
         
-        const margin = 48;
         let x, y;
         
         // Get actual dimensions, considering preferred size if layout not complete
@@ -214,26 +218,26 @@ export default class WallpaperInfoExtension extends Extension {
         if (width === 0 || height === 0) {
             let [minWidth, naturalWidth] = this._mainContainer.get_preferred_width(-1);
             let [minHeight, naturalHeight] = this._mainContainer.get_preferred_height(-1);
-            width = naturalWidth || minWidth || 200; // fallback to 200 if still 0
-            height = naturalHeight || minHeight || 100; // fallback to 100 if still 0
+            width = naturalWidth || minWidth || FALLBACK_WIDTH;
+            height = naturalHeight || minHeight || FALLBACK_HEIGHT;
         }
         
         // Calculate X position
         if (horizontalPos === 'left') {
-            x = monitor.x + margin;
+            x = monitor.x + POSITION_MARGIN;
         } else if (horizontalPos === 'center') {
             x = monitor.x + Math.floor((monitor.width - width) / 2);
         } else { // right
-            x = monitor.x + monitor.width - width - margin;
+            x = monitor.x + monitor.width - width - POSITION_MARGIN;
         }
         
         // Calculate Y position
         if (verticalPos === 'top') {
-            y = monitor.y + margin;
+            y = monitor.y + POSITION_MARGIN;
         } else if (verticalPos === 'middle') {
             y = monitor.y + Math.floor((monitor.height - height) / 2);
         } else { // bottom
-            y = monitor.y + monitor.height - height - margin;
+            y = monitor.y + monitor.height - height - POSITION_MARGIN;
         }
         
         return [x, y];
