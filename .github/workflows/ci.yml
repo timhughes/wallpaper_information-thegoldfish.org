@@ -1,0 +1,29 @@
+name: Lint and Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gjs libgirepository1.0-dev wget jq
+          wget https://github.com/ptomato/jasmine-gjs/releases/download/3.10.1/jasmine-gjs_3.10.1-1_all.deb
+          sudo dpkg -i jasmine-gjs_3.10.1-1_all.deb || sudo apt-get install -f -y
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Run CI Suite (Lint, Test, Pack)
+        run: make all

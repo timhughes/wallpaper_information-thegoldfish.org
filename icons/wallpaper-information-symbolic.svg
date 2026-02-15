@@ -1,0 +1,15 @@
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+    <!-- Monitor Body -->
+    <path d="M2 3c-.554 0-1 .446-1 1v7c0 .554.446 1 1 1h12c.554 0 1-.446 1-1V4c0-.554-.446-1-1-1H2zm0 1h12v7H2V4z" fill="#2e3436"/>
+    
+    <!-- Monitor Stand -->
+    <path d="M6 12l-.5 2h5l-.5-2H6zm-2 2v1h8v-1H4z" fill="#2e3436"/>
+    
+    <!-- HUD Overlay in Top-Left (Symbolic) -->
+    <rect x="3" y="5" width="2" height="0.5" fill="#2e3436"/>
+    <rect x="3" y="6" width="3" height="0.5" fill="#2e3436"/>
+    <rect x="3" y="7" width="1.5" height="0.5" fill="#2e3436"/>
+    
+    <!-- Accent Dot (Symbolic) -->
+    <circle cx="5.5" cy="5.25" r="0.4" fill="#2e3436"/>
+</svg>

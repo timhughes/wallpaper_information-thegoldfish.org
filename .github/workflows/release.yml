@@ -1,0 +1,39 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Get Version and UUID
+        id: metadata
+        run: |
+          UUID=$(jq -r '.uuid' metadata.json)
+          VERSION=$(jq -r '.version // "1"' metadata.json)
+          echo "uuid=$UUID" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "filename=${UUID}.v${VERSION}.zip" >> $GITHUB_OUTPUT
+
+      - name: Create and Lint Package
+        run: |
+          make pack lint
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ${{ steps.metadata.outputs.filename }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

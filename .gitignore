@@ -1,0 +1,26 @@
+# GNOME Shell Extension Artifacts
+schemas/gschemas.compiled
+*.v*.zip
+
+# Python Virtual Environments
+venv/
+.venv/
+env/
+.env/
+
+# Python Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+
+# IDE Specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS Specific
+.DS_Store
+Thumbs.db
