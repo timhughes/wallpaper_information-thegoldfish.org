@@ -184,7 +184,8 @@ export default class WallpaperInfoExtension extends Extension {
     }
 
     init() {
-        // Extension initialization
+        // Extension initialization - required by GNOME Shell Extension API
+        // Actual initialization happens in the constructor
     }
 
     enable() {
