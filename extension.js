@@ -165,8 +165,9 @@ function createInfobox() {
     infobox.set_position(monitor.x + Math.floor(48),
                       monitor.y + Math.floor(64));
 
-    let n_children = Main.layoutManager._backgroundGroup.get_n_children();
-    Main.layoutManager._backgroundGroup.insert_child_at_index(infobox, n_children);
+    // Add to background group to appear behind windows but on top of wallpaper
+    // Note: _backgroundGroup is an internal API but is the standard way to add desktop overlays
+    Main.layoutManager._backgroundGroup.add_child(infobox);
     
     // Initialize network monitoring for event-based updates
     initNetworkMonitoring();
