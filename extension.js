@@ -192,6 +192,7 @@ export default class WallpaperInfoExtension extends Extension {
         this._mainContainer = null;
         this._logoContainer = null;
         this._distroLogoContainer = null;
+        this._osReleaseInfo = null;  // Cache OS release info
         this._timeoutId = null;
         this._nmProxy = null;
         this._nmSignalId = null;
@@ -203,7 +204,7 @@ export default class WallpaperInfoExtension extends Extension {
     // Create information items
     _createInfoItems() {
         return [
-            new InfoItem('distro-name', 'Distro', (info) => info.distro_name),
+            new InfoItem('distro-name', 'Distribution', (info) => info.distro_name),
             new InfoItem('distro-version', 'Version', (info) => info.distro_version),
             new InfoItem('hostname', 'Hostname', (info) => info.hostname),
             new InfoItem('boot-time', 'Boot Time', (info) => info.boot_time),
@@ -370,6 +371,11 @@ export default class WallpaperInfoExtension extends Extension {
         }
     }
     
+    // Get the insertion index for logo items (after company logo if present)
+    _getLogoInsertIndex() {
+        return this._logoContainer ? 1 : 0;
+    }
+    
     // Update distro logo display
     _updateDistroLogo() {
         const showDistroLogo = this._settings.get_boolean('show-distro-logo');
@@ -381,35 +387,37 @@ export default class WallpaperInfoExtension extends Extension {
         }
         
         if (showDistroLogo) {
-            // Get distro logo name from system info
-            let info = getSystemInfo();
-            if (info.distro_logo) {
+            // Use cached OS release info if available
+            if (!this._osReleaseInfo) {
+                this._osReleaseInfo = getOSReleaseInfo();
+            }
+            
+            if (this._osReleaseInfo.logo) {
                 try {
                     // Try to find the logo icon in the icon theme
                     // GNOME's icon theme will search standard locations like /usr/share/pixmaps
                     const iconTheme = St.IconTheme.get_default();
                     
                     // Check if icon exists in theme
-                    if (iconTheme.has_icon(info.distro_logo)) {
+                    if (iconTheme.has_icon(this._osReleaseInfo.logo)) {
                         const logoSize = this._settings.get_int('logo-size');
                         const icon = new St.Icon({
-                            icon_name: info.distro_logo,
+                            icon_name: this._osReleaseInfo.logo,
                             icon_size: logoSize,
                             style_class: 'logo-icon'
                         });
                         
                         // Insert distro logo after company logo (or at beginning if no company logo)
-                        let insertIndex = this._logoContainer ? 1 : 0;
-                        this._mainContainer.insert_child_at_index(icon, insertIndex);
+                        this._mainContainer.insert_child_at_index(icon, this._getLogoInsertIndex());
                         this._distroLogoContainer = icon;
                     } else {
                         // Try common locations for distro logos
                         let logoPath = null;
                         const possiblePaths = [
-                            `/usr/share/pixmaps/${info.distro_logo}.svg`,
-                            `/usr/share/pixmaps/${info.distro_logo}.png`,
-                            `/usr/share/icons/hicolor/scalable/apps/${info.distro_logo}.svg`,
-                            `/usr/share/icons/hicolor/128x128/apps/${info.distro_logo}.png`
+                            `/usr/share/pixmaps/${this._osReleaseInfo.logo}.svg`,
+                            `/usr/share/pixmaps/${this._osReleaseInfo.logo}.png`,
+                            `/usr/share/icons/hicolor/scalable/apps/${this._osReleaseInfo.logo}.svg`,
+                            `/usr/share/icons/hicolor/128x128/apps/${this._osReleaseInfo.logo}.png`
                         ];
                         
                         for (let path of possiblePaths) {
@@ -428,8 +436,7 @@ export default class WallpaperInfoExtension extends Extension {
                                 style_class: 'logo-icon'
                             });
                             
-                            let insertIndex = this._logoContainer ? 1 : 0;
-                            this._mainContainer.insert_child_at_index(icon, insertIndex);
+                            this._mainContainer.insert_child_at_index(icon, this._getLogoInsertIndex());
                             this._distroLogoContainer = icon;
                         }
                     }
@@ -565,6 +572,8 @@ export default class WallpaperInfoExtension extends Extension {
 
     enable() {
         this._settings = this.getSettings();
+        // Cache OS release info once at startup
+        this._osReleaseInfo = getOSReleaseInfo();
         this._createInfobox();
     }
 
@@ -592,6 +601,7 @@ export default class WallpaperInfoExtension extends Extension {
         
         this._logoContainer = null;
         this._distroLogoContainer = null;
+        this._osReleaseInfo = null;
         this._infoItems = [];
         this._settings = null;
     }
