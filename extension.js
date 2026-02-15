@@ -282,12 +282,15 @@ export default class WallpaperInfoExtension extends Extension {
         const logoPath = this._settings.get_string('logo-path');
         const logoSize = this._settings.get_int('logo-size');
         
-        // Remove existing logo if present
+        // Remove existing logo if we need to hide it or recreate it
+        // Note: We recreate the logo instead of updating properties for simplicity,
+        // as logo changes are infrequent and the overhead is minimal
         if (this._logoContainer) {
             this._logoContainer.destroy();
             this._logoContainer = null;
         }
         
+        // Create new logo if enabled and path is valid
         if (showLogo && logoPath && logoPath.length > 0) {
             try {
                 const file = Gio.File.new_for_path(logoPath);
@@ -380,9 +383,12 @@ export default class WallpaperInfoExtension extends Extension {
         let posSignal1 = this._settings.connect('changed::position-vertical', () => {
             this._updatePosition();
         });
+        this._settingsSignals.push(posSignal1);
+        
         let posSignal2 = this._settings.connect('changed::position-horizontal', () => {
             this._updatePosition();
         });
+        this._settingsSignals.push(posSignal2);
         
         // Appearance changes
         let styleKeys = ['font-family', 'font-size', 'font-color', 'background-color', 
@@ -412,9 +418,6 @@ export default class WallpaperInfoExtension extends Extension {
             });
             this._settingsSignals.push(signal);
         });
-        
-        this._settingsSignals.push(posSignal1);
-        this._settingsSignals.push(posSignal2);
     }
 
     init() {
