@@ -138,8 +138,7 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         
         // Font color
         const fontColorRow = new Adw.EntryRow({
-            title: 'Font Color',
-            subtitle: 'Hex color (e.g., #ffffff)'
+            title: 'Font Color'
         });
         settings.bind('font-color', fontColorRow, 'text', Gio.SettingsBindFlags.DEFAULT);
         fontGroup.add(fontColorRow);
@@ -153,8 +152,7 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         
         // Background color
         const bgColorRow = new Adw.EntryRow({
-            title: 'Background Color',
-            subtitle: 'RGBA color (e.g., rgba(10,10,10,0.5))'
+            title: 'Background Color'
         });
         settings.bind('background-color', bgColorRow, 'text', Gio.SettingsBindFlags.DEFAULT);
         bgGroup.add(bgColorRow);
