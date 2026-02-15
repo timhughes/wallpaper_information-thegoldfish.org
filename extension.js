@@ -572,7 +572,7 @@ export default class WallpaperInfoExtension extends Extension {
     }
 
     enable() {
-        this._settings = this.getSettings();
+        this._settings = this.getSettings('org.gnome.shell.extensions.wallpaper-information');
         // Cache OS release info once at startup
         this._osReleaseInfo = getOSReleaseInfo();
         this._createInfobox();

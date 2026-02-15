@@ -13,7 +13,7 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 
 export default class WallpaperInfoPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
-        const settings = this.getSettings();
+        const settings = this.getSettings('org.gnome.shell.extensions.wallpaper-information');
         
         // Position Page
         const positionPage = new Adw.PreferencesPage({
