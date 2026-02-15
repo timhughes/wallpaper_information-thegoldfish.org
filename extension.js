@@ -8,6 +8,7 @@
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import St from 'gi://St';
+import Clutter from 'gi://Clutter';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
@@ -94,26 +95,59 @@ function getNetworkInfo() {
     return ips.length > 0 ? ips.join(', ') : 'N/A';
 }
 
-// Format system information for display
-function formatSystemInfo(info) {
-    let lines = [];
-    lines.push(`Hostname: ${info.hostname}`);
-    lines.push(`Boot Time: ${info.boot_time}`);
-    lines.push(`IP Address: ${info.ipaddress}`);
-    lines.push(`Kernel: ${info.kernelversion}`);
-    if (info.chassis_asset_tag && info.chassis_asset_tag !== 'N/A') {
-        lines.push(`Asset Tag: ${info.chassis_asset_tag}`);
+// Information item definition
+class InfoItem {
+    constructor(key, label, getValue) {
+        this.key = key;
+        this.label = label;
+        this.getValue = getValue;
+        this.container = null;
     }
-    return lines.join('\n');
+    
+    createContainer(settings) {
+        this.container = new St.Label({
+            style_class: 'info-item',
+            text: ''
+        });
+        return this.container;
+    }
+    
+    update(info) {
+        if (this.container) {
+            const value = this.getValue(info);
+            this.container.text = `${this.label}: ${value}`;
+        }
+    }
+    
+    setVisible(visible) {
+        if (this.container) {
+            this.container.visible = visible;
+        }
+    }
 }
 
 export default class WallpaperInfoExtension extends Extension {
     constructor(metadata) {
         super(metadata);
-        this._infobox = null;
+        this._mainContainer = null;
+        this._logoContainer = null;
         this._timeoutId = null;
         this._nmProxy = null;
         this._nmSignalId = null;
+        this._settings = null;
+        this._settingsSignals = [];
+        this._infoItems = [];
+    }
+    
+    // Create information items
+    _createInfoItems() {
+        return [
+            new InfoItem('hostname', 'Hostname', (info) => info.hostname),
+            new InfoItem('boot-time', 'Boot Time', (info) => info.boot_time),
+            new InfoItem('ip-address', 'IP Address', (info) => info.ipaddress),
+            new InfoItem('kernel', 'Kernel', (info) => info.kernelversion),
+            new InfoItem('asset-tag', 'Asset Tag', (info) => info.chassis_asset_tag)
+        ];
     }
 
     // Initialize NetworkManager DBus proxy for network change notifications
@@ -150,37 +184,220 @@ export default class WallpaperInfoExtension extends Extension {
 
     // Update the infobox with current system information
     _updateInfobox() {
-        if (this._infobox) {
+        if (this._mainContainer) {
             let info = getSystemInfo();
-            this._infobox.text = formatSystemInfo(info);
+            
+            // Update each information item
+            this._infoItems.forEach(item => {
+                item.update(info);
+            });
+            
+            // Update logo if needed
+            this._updateLogo();
         }
         return GLib.SOURCE_CONTINUE;
+    }
+    
+    // Calculate position based on settings
+    _calculatePosition(monitor) {
+        const verticalPos = this._settings.get_string('position-vertical');
+        const horizontalPos = this._settings.get_string('position-horizontal');
+        
+        const margin = 48;
+        let x, y;
+        
+        // Calculate X position
+        if (horizontalPos === 'left') {
+            x = monitor.x + margin;
+        } else if (horizontalPos === 'center') {
+            x = monitor.x + Math.floor((monitor.width - this._mainContainer.width) / 2);
+        } else { // right
+            x = monitor.x + monitor.width - this._mainContainer.width - margin;
+        }
+        
+        // Calculate Y position
+        if (verticalPos === 'top') {
+            y = monitor.y + margin;
+        } else if (verticalPos === 'middle') {
+            y = monitor.y + Math.floor((monitor.height - this._mainContainer.height) / 2);
+        } else { // bottom
+            y = monitor.y + monitor.height - this._mainContainer.height - margin;
+        }
+        
+        return [x, y];
+    }
+    
+    // Update position
+    _updatePosition() {
+        if (this._mainContainer) {
+            let monitor = Main.layoutManager.primaryMonitor;
+            let [x, y] = this._calculatePosition(monitor);
+            this._mainContainer.set_position(x, y);
+        }
+    }
+    
+    // Apply styling from settings
+    _applyStyles() {
+        if (!this._mainContainer) return;
+        
+        const fontFamily = this._settings.get_string('font-family');
+        const fontSize = this._settings.get_int('font-size');
+        const fontColor = this._settings.get_string('font-color');
+        const bgColor = this._settings.get_string('background-color');
+        const borderRadius = this._settings.get_int('border-radius');
+        const padding = this._settings.get_int('padding');
+        
+        const style = `
+            font-family: ${fontFamily};
+            font-size: ${fontSize}px;
+            font-weight: bold;
+            color: ${fontColor};
+            background-color: ${bgColor};
+            border-radius: ${borderRadius}px;
+            padding: ${padding}px;
+        `;
+        
+        this._mainContainer.set_style(style);
+    }
+    
+    // Update logo display
+    _updateLogo() {
+        const showLogo = this._settings.get_boolean('show-logo');
+        const logoPath = this._settings.get_string('logo-path');
+        const logoSize = this._settings.get_int('logo-size');
+        
+        // Remove existing logo if present
+        if (this._logoContainer) {
+            this._logoContainer.destroy();
+            this._logoContainer = null;
+        }
+        
+        if (showLogo && logoPath && logoPath.length > 0) {
+            try {
+                const file = Gio.File.new_for_path(logoPath);
+                if (file.query_exists(null)) {
+                    const icon = new St.Icon({
+                        gicon: Gio.icon_new_for_string(logoPath),
+                        icon_size: logoSize,
+                        style_class: 'logo-icon'
+                    });
+                    
+                    // Insert logo at the beginning of the container
+                    this._mainContainer.insert_child_at_index(icon, 0);
+                    this._logoContainer = icon;
+                }
+            } catch (e) {
+                logError(e, 'Failed to load logo');
+            }
+        }
+    }
+    
+    // Update visibility of information items based on settings
+    _updateItemVisibility() {
+        const visibilityMap = {
+            'hostname': 'show-hostname',
+            'boot-time': 'show-boot-time',
+            'ip-address': 'show-ip-address',
+            'kernel': 'show-kernel',
+            'asset-tag': 'show-asset-tag'
+        };
+        
+        this._infoItems.forEach(item => {
+            const settingsKey = visibilityMap[item.key];
+            if (settingsKey) {
+                const visible = this._settings.get_boolean(settingsKey);
+                item.setVisible(visible);
+            }
+        });
     }
 
     _createInfobox() {
         let monitor = Main.layoutManager.primaryMonitor;
 
-        if (!this._infobox) {
-            this._infobox = new St.Label({ style_class: 'infobox-label', text: '' });
-        }
+        // Create main container as a vertical box layout
+        this._mainContainer = new St.BoxLayout({
+            vertical: true,
+            style_class: 'infobox-container'
+        });
+
+        // Create information items
+        this._infoItems = this._createInfoItems();
+        
+        // Add each item container to main container
+        this._infoItems.forEach(item => {
+            const container = item.createContainer(this._settings);
+            this._mainContainer.add_child(container);
+        });
 
         // Initial update
         this._updateInfobox();
+        
+        // Apply styles
+        this._applyStyles();
+        
+        // Update visibility
+        this._updateItemVisibility();
 
-        this._infobox.set_position(monitor.x + Math.floor(48),
-                          monitor.y + Math.floor(64));
+        // Set initial position
+        let [x, y] = this._calculatePosition(monitor);
+        this._mainContainer.set_position(x, y);
 
         // Add to background group to appear behind windows but on top of wallpaper
-        // Note: _backgroundGroup is an internal API but is the standard way to add desktop overlays
-        Main.layoutManager._backgroundGroup.add_child(this._infobox);
+        Main.layoutManager._backgroundGroup.add_child(this._mainContainer);
         
         // Initialize network monitoring for event-based updates
         this._initNetworkMonitoring();
         
-        // Still poll periodically for boot time and other info (every 30 seconds instead of 1)
+        // Setup settings change listeners
+        this._setupSettingsListeners();
+        
+        // Still poll periodically for boot time and other info (every 30 seconds)
         this._timeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 30, () => {
             return this._updateInfobox();
         });
+    }
+    
+    // Setup settings change listeners
+    _setupSettingsListeners() {
+        // Position changes
+        let posSignal1 = this._settings.connect('changed::position-vertical', () => {
+            this._updatePosition();
+        });
+        let posSignal2 = this._settings.connect('changed::position-horizontal', () => {
+            this._updatePosition();
+        });
+        
+        // Appearance changes
+        let styleKeys = ['font-family', 'font-size', 'font-color', 'background-color', 
+                         'border-radius', 'padding'];
+        styleKeys.forEach(key => {
+            let signal = this._settings.connect(`changed::${key}`, () => {
+                this._applyStyles();
+            });
+            this._settingsSignals.push(signal);
+        });
+        
+        // Logo changes
+        let logoKeys = ['show-logo', 'logo-path', 'logo-size'];
+        logoKeys.forEach(key => {
+            let signal = this._settings.connect(`changed::${key}`, () => {
+                this._updateLogo();
+            });
+            this._settingsSignals.push(signal);
+        });
+        
+        // Visibility changes
+        let visKeys = ['show-hostname', 'show-boot-time', 'show-ip-address', 
+                       'show-kernel', 'show-asset-tag'];
+        visKeys.forEach(key => {
+            let signal = this._settings.connect(`changed::${key}`, () => {
+                this._updateItemVisibility();
+            });
+            this._settingsSignals.push(signal);
+        });
+        
+        this._settingsSignals.push(posSignal1);
+        this._settingsSignals.push(posSignal2);
     }
 
     init() {
@@ -189,6 +406,7 @@ export default class WallpaperInfoExtension extends Extension {
     }
 
     enable() {
+        this._settings = this.getSettings();
         this._createInfobox();
     }
 
@@ -200,10 +418,22 @@ export default class WallpaperInfoExtension extends Extension {
         
         this._cleanupNetworkMonitoring();
         
-        if (this._infobox) {
-            Main.layoutManager._backgroundGroup.remove_child(this._infobox);
-            this._infobox.destroy();
-            this._infobox = null;
+        // Disconnect settings signals
+        if (this._settings && this._settingsSignals.length > 0) {
+            this._settingsSignals.forEach(signal => {
+                this._settings.disconnect(signal);
+            });
+            this._settingsSignals = [];
         }
+        
+        if (this._mainContainer) {
+            Main.layoutManager._backgroundGroup.remove_child(this._mainContainer);
+            this._mainContainer.destroy();
+            this._mainContainer = null;
+        }
+        
+        this._logoContainer = null;
+        this._infoItems = [];
+        this._settings = null;
     }
 }

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.wallpaper-information" path="/org/gnome/shell/extensions/wallpaper-information/">
+    
+    <!-- Position Settings -->
+    <key name="position-vertical" type="s">
+      <default>"top"</default>
+      <summary>Vertical position</summary>
+      <description>Vertical position of the information box: top, middle, or bottom</description>
+      <choices>
+        <choice value="top"/>
+        <choice value="middle"/>
+        <choice value="bottom"/>
+      </choices>
+    </key>
+    
+    <key name="position-horizontal" type="s">
+      <default>"left"</default>
+      <summary>Horizontal position</summary>
+      <description>Horizontal position of the information box: left, center, or right</description>
+      <choices>
+        <choice value="left"/>
+        <choice value="center"/>
+        <choice value="right"/>
+      </choices>
+    </key>
+    
+    <!-- Information Item Toggles -->
+    <key name="show-hostname" type="b">
+      <default>true</default>
+      <summary>Show hostname</summary>
+      <description>Display the system hostname</description>
+    </key>
+    
+    <key name="show-boot-time" type="b">
+      <default>true</default>
+      <summary>Show boot time</summary>
+      <description>Display the system boot time</description>
+    </key>
+    
+    <key name="show-ip-address" type="b">
+      <default>true</default>
+      <summary>Show IP address</summary>
+      <description>Display the system IP address(es)</description>
+    </key>
+    
+    <key name="show-kernel" type="b">
+      <default>true</default>
+      <summary>Show kernel version</summary>
+      <description>Display the kernel version</description>
+    </key>
+    
+    <key name="show-asset-tag" type="b">
+      <default>true</default>
+      <summary>Show asset tag</summary>
+      <description>Display the chassis asset tag</description>
+    </key>
+    
+    <!-- Font Settings -->
+    <key name="font-family" type="s">
+      <default>"Sans"</default>
+      <summary>Font family</summary>
+      <description>Font family for the information text</description>
+    </key>
+    
+    <key name="font-size" type="i">
+      <default>24</default>
+      <summary>Font size</summary>
+      <description>Font size in pixels</description>
+      <range min="8" max="72"/>
+    </key>
+    
+    <key name="font-color" type="s">
+      <default>"#ffffff"</default>
+      <summary>Font color</summary>
+      <description>Font color in hex format</description>
+    </key>
+    
+    <key name="background-color" type="s">
+      <default>"rgba(10,10,10,0.5)"</default>
+      <summary>Background color</summary>
+      <description>Background color in rgba format</description>
+    </key>
+    
+    <key name="border-radius" type="i">
+      <default>10</default>
+      <summary>Border radius</summary>
+      <description>Border radius in pixels</description>
+      <range min="0" max="50"/>
+    </key>
+    
+    <key name="padding" type="i">
+      <default>12</default>
+      <summary>Padding</summary>
+      <description>Internal padding in pixels</description>
+      <range min="0" max="50"/>
+    </key>
+    
+    <!-- Logo Settings -->
+    <key name="show-logo" type="b">
+      <default>false</default>
+      <summary>Show company logo</summary>
+      <description>Display a company logo</description>
+    </key>
+    
+    <key name="logo-path" type="s">
+      <default>""</default>
+      <summary>Logo file path</summary>
+      <description>Path to the logo image file</description>
+    </key>
+    
+    <key name="logo-size" type="i">
+      <default>64</default>
+      <summary>Logo size</summary>
+      <description>Logo size in pixels</description>
+      <range min="16" max="256"/>
+    </key>
+    
+  </schema>
+</schemalist>
