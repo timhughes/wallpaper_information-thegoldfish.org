@@ -66,11 +66,11 @@ function getOSReleaseInfo() {
 }
 
 // Get system information using native APIs
-function getSystemInfo() {
+function getSystemInfo(osReleaseInfo = null) {
     let info = {};
     
-    // OS Release information
-    let osRelease = getOSReleaseInfo();
+    // OS Release information (use cached value if provided, otherwise parse)
+    let osRelease = osReleaseInfo || getOSReleaseInfo();
     info.distro_name = osRelease.name;
     info.distro_version = osRelease.version;
     info.distro_pretty_name = osRelease.pretty_name;
@@ -199,6 +199,17 @@ export default class WallpaperInfoExtension extends Extension {
         this._settings = null;
         this._settingsSignals = [];
         this._infoItems = [];
+        
+        // Visibility map - single source of truth for item key to settings key mapping
+        this._visibilityMap = {
+            'distro-name': 'show-distro-name',
+            'distro-version': 'show-distro-version',
+            'hostname': 'show-hostname',
+            'boot-time': 'show-boot-time',
+            'ip-address': 'show-ip-address',
+            'kernel': 'show-kernel',
+            'asset-tag': 'show-asset-tag'
+        };
     }
     
     // Create information items
@@ -249,7 +260,8 @@ export default class WallpaperInfoExtension extends Extension {
     // Update the infobox with current system information
     _updateInfobox() {
         if (this._mainContainer) {
-            let info = getSystemInfo();
+            // Pass cached OS release info to avoid redundant file I/O
+            let info = getSystemInfo(this._osReleaseInfo);
             
             // Update each information item
             this._infoItems.forEach(item => {
@@ -372,6 +384,7 @@ export default class WallpaperInfoExtension extends Extension {
     }
     
     // Get the insertion index for logo items (after company logo if present)
+    // Returns 1 to insert after company logo, or 0 to insert at the beginning
     _getLogoInsertIndex() {
         return this._logoContainer ? 1 : 0;
     }
@@ -449,18 +462,8 @@ export default class WallpaperInfoExtension extends Extension {
     
     // Update visibility of information items based on settings
     _updateItemVisibility() {
-        const visibilityMap = {
-            'distro-name': 'show-distro-name',
-            'distro-version': 'show-distro-version',
-            'hostname': 'show-hostname',
-            'boot-time': 'show-boot-time',
-            'ip-address': 'show-ip-address',
-            'kernel': 'show-kernel',
-            'asset-tag': 'show-asset-tag'
-        };
-        
         this._infoItems.forEach(item => {
-            const settingsKey = visibilityMap[item.key];
+            const settingsKey = this._visibilityMap[item.key];
             if (settingsKey) {
                 const visible = this._settings.get_boolean(settingsKey);
                 item.setVisible(visible);
@@ -554,10 +557,8 @@ export default class WallpaperInfoExtension extends Extension {
         });
         this._settingsSignals.push(distroLogoSignal);
         
-        // Visibility changes
-        let visKeys = ['show-distro-name', 'show-distro-version', 'show-hostname', 
-                       'show-boot-time', 'show-ip-address', 'show-kernel', 'show-asset-tag'];
-        visKeys.forEach(key => {
+        // Visibility changes - derive keys from visibility map to avoid duplication
+        Object.values(this._visibilityMap).forEach(key => {
             let signal = this._settings.connect(`changed::${key}`, () => {
                 this._updateItemVisibility();
             });
