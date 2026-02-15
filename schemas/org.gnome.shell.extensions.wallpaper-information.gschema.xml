@@ -26,6 +26,18 @@
     </key>
     
     <!-- Information Item Toggles -->
+    <key name="show-distro-name" type="b">
+      <default>true</default>
+      <summary>Show distribution name</summary>
+      <description>Display the Linux distribution name</description>
+    </key>
+    
+    <key name="show-distro-version" type="b">
+      <default>true</default>
+      <summary>Show distribution version</summary>
+      <description>Display the Linux distribution version</description>
+    </key>
+    
     <key name="show-hostname" type="b">
       <default>true</default>
       <summary>Show hostname</summary>
@@ -114,6 +126,12 @@
       <summary>Logo size</summary>
       <description>Logo size in pixels</description>
       <range min="16" max="256"/>
+    </key>
+    
+    <key name="show-distro-logo" type="b">
+      <default>true</default>
+      <summary>Show distribution logo</summary>
+      <description>Display the Linux distribution logo</description>
     </key>
     
   </schema>

@@ -83,6 +83,8 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         
         // Toggle switches for each information item
         const items = [
+            { key: 'show-distro-name', title: 'Distribution Name', subtitle: 'Display the Linux distribution name' },
+            { key: 'show-distro-version', title: 'Distribution Version', subtitle: 'Display the Linux distribution version' },
             { key: 'show-hostname', title: 'Hostname', subtitle: 'Display the system hostname' },
             { key: 'show-boot-time', title: 'Boot Time', subtitle: 'Display when the system was last booted' },
             { key: 'show-ip-address', title: 'IP Address', subtitle: 'Display network IP addresses' },
@@ -271,5 +273,20 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         });
         settings.bind('logo-size', logoSizeRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         logoGroup.add(logoSizeRow);
+        
+        // Distribution Logo Group
+        const distroLogoGroup = new Adw.PreferencesGroup({
+            title: 'Distribution Logo',
+            description: 'Display your Linux distribution logo (from /etc/os-release)'
+        });
+        logoPage.add(distroLogoGroup);
+        
+        // Show distro logo toggle
+        const showDistroLogoRow = new Adw.SwitchRow({
+            title: 'Show Distribution Logo',
+            subtitle: 'Display the Linux distribution logo automatically'
+        });
+        settings.bind('show-distro-logo', showDistroLogoRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        distroLogoGroup.add(showDistroLogoRow);
     }
 }

@@ -17,9 +17,64 @@ const FALLBACK_WIDTH = 200;  // Fallback width if dimension calculation fails
 const FALLBACK_HEIGHT = 100;  // Fallback height if dimension calculation fails
 const POSITION_MARGIN = 48;  // Margin from screen edges
 
+// Parse /etc/os-release file
+function getOSReleaseInfo() {
+    let osInfo = {
+        name: 'N/A',
+        version: 'N/A',
+        pretty_name: 'N/A',
+        logo: null
+    };
+    
+    try {
+        let [ok, contents] = GLib.file_get_contents('/etc/os-release');
+        if (ok) {
+            let lines = new TextDecoder().decode(contents).split('\n');
+            for (let line of lines) {
+                line = line.trim();
+                if (!line || line.startsWith('#')) continue;
+                
+                // Parse KEY=VALUE or KEY="VALUE" format
+                let match = line.match(/^([A-Z_]+)=(.+)$/);
+                if (match) {
+                    let key = match[1];
+                    let value = match[2];
+                    
+                    // Remove quotes if present
+                    if ((value.startsWith('"') && value.endsWith('"')) ||
+                        (value.startsWith("'") && value.endsWith("'"))) {
+                        value = value.slice(1, -1);
+                    }
+                    
+                    if (key === 'NAME') {
+                        osInfo.name = value;
+                    } else if (key === 'VERSION') {
+                        osInfo.version = value;
+                    } else if (key === 'PRETTY_NAME') {
+                        osInfo.pretty_name = value;
+                    } else if (key === 'LOGO') {
+                        osInfo.logo = value;
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        logError(e, 'Failed to read /etc/os-release');
+    }
+    
+    return osInfo;
+}
+
 // Get system information using native APIs
 function getSystemInfo() {
     let info = {};
+    
+    // OS Release information
+    let osRelease = getOSReleaseInfo();
+    info.distro_name = osRelease.name;
+    info.distro_version = osRelease.version;
+    info.distro_pretty_name = osRelease.pretty_name;
+    info.distro_logo = osRelease.logo;
     
     // Hostname
     info.hostname = GLib.get_host_name();
@@ -136,6 +191,7 @@ export default class WallpaperInfoExtension extends Extension {
         super(metadata);
         this._mainContainer = null;
         this._logoContainer = null;
+        this._distroLogoContainer = null;
         this._timeoutId = null;
         this._nmProxy = null;
         this._nmSignalId = null;
@@ -147,6 +203,8 @@ export default class WallpaperInfoExtension extends Extension {
     // Create information items
     _createInfoItems() {
         return [
+            new InfoItem('distro-name', 'Distro', (info) => info.distro_name),
+            new InfoItem('distro-version', 'Version', (info) => info.distro_version),
             new InfoItem('hostname', 'Hostname', (info) => info.hostname),
             new InfoItem('boot-time', 'Boot Time', (info) => info.boot_time),
             new InfoItem('ip-address', 'IP Address', (info) => info.ipaddress),
@@ -197,8 +255,9 @@ export default class WallpaperInfoExtension extends Extension {
                 item.update(info);
             });
             
-            // Update logo if needed
+            // Update logos if needed
             this._updateLogo();
+            this._updateDistroLogo();
         }
         return GLib.SOURCE_CONTINUE;
     }
@@ -311,9 +370,81 @@ export default class WallpaperInfoExtension extends Extension {
         }
     }
     
+    // Update distro logo display
+    _updateDistroLogo() {
+        const showDistroLogo = this._settings.get_boolean('show-distro-logo');
+        
+        // Remove existing distro logo if present
+        if (this._distroLogoContainer) {
+            this._distroLogoContainer.destroy();
+            this._distroLogoContainer = null;
+        }
+        
+        if (showDistroLogo) {
+            // Get distro logo name from system info
+            let info = getSystemInfo();
+            if (info.distro_logo) {
+                try {
+                    // Try to find the logo icon in the icon theme
+                    // GNOME's icon theme will search standard locations like /usr/share/pixmaps
+                    const iconTheme = St.IconTheme.get_default();
+                    
+                    // Check if icon exists in theme
+                    if (iconTheme.has_icon(info.distro_logo)) {
+                        const logoSize = this._settings.get_int('logo-size');
+                        const icon = new St.Icon({
+                            icon_name: info.distro_logo,
+                            icon_size: logoSize,
+                            style_class: 'logo-icon'
+                        });
+                        
+                        // Insert distro logo after company logo (or at beginning if no company logo)
+                        let insertIndex = this._logoContainer ? 1 : 0;
+                        this._mainContainer.insert_child_at_index(icon, insertIndex);
+                        this._distroLogoContainer = icon;
+                    } else {
+                        // Try common locations for distro logos
+                        let logoPath = null;
+                        const possiblePaths = [
+                            `/usr/share/pixmaps/${info.distro_logo}.svg`,
+                            `/usr/share/pixmaps/${info.distro_logo}.png`,
+                            `/usr/share/icons/hicolor/scalable/apps/${info.distro_logo}.svg`,
+                            `/usr/share/icons/hicolor/128x128/apps/${info.distro_logo}.png`
+                        ];
+                        
+                        for (let path of possiblePaths) {
+                            const file = Gio.File.new_for_path(path);
+                            if (file.query_exists(null)) {
+                                logoPath = path;
+                                break;
+                            }
+                        }
+                        
+                        if (logoPath) {
+                            const logoSize = this._settings.get_int('logo-size');
+                            const icon = new St.Icon({
+                                gicon: Gio.icon_new_for_string(logoPath),
+                                icon_size: logoSize,
+                                style_class: 'logo-icon'
+                            });
+                            
+                            let insertIndex = this._logoContainer ? 1 : 0;
+                            this._mainContainer.insert_child_at_index(icon, insertIndex);
+                            this._distroLogoContainer = icon;
+                        }
+                    }
+                } catch (e) {
+                    logError(e, 'Failed to load distro logo');
+                }
+            }
+        }
+    }
+    
     // Update visibility of information items based on settings
     _updateItemVisibility() {
         const visibilityMap = {
+            'distro-name': 'show-distro-name',
+            'distro-version': 'show-distro-version',
             'hostname': 'show-hostname',
             'boot-time': 'show-boot-time',
             'ip-address': 'show-ip-address',
@@ -400,18 +531,25 @@ export default class WallpaperInfoExtension extends Extension {
             this._settingsSignals.push(signal);
         });
         
-        // Logo changes
+        // Logo changes (affects both company and distro logo size)
         let logoKeys = ['show-logo', 'logo-path', 'logo-size'];
         logoKeys.forEach(key => {
             let signal = this._settings.connect(`changed::${key}`, () => {
                 this._updateLogo();
+                this._updateDistroLogo();
             });
             this._settingsSignals.push(signal);
         });
         
+        // Distro logo changes
+        let distroLogoSignal = this._settings.connect('changed::show-distro-logo', () => {
+            this._updateDistroLogo();
+        });
+        this._settingsSignals.push(distroLogoSignal);
+        
         // Visibility changes
-        let visKeys = ['show-hostname', 'show-boot-time', 'show-ip-address', 
-                       'show-kernel', 'show-asset-tag'];
+        let visKeys = ['show-distro-name', 'show-distro-version', 'show-hostname', 
+                       'show-boot-time', 'show-ip-address', 'show-kernel', 'show-asset-tag'];
         visKeys.forEach(key => {
             let signal = this._settings.connect(`changed::${key}`, () => {
                 this._updateItemVisibility();
@@ -453,6 +591,7 @@ export default class WallpaperInfoExtension extends Extension {
         }
         
         this._logoContainer = null;
+        this._distroLogoContainer = null;
         this._infoItems = [];
         this._settings = null;
     }
