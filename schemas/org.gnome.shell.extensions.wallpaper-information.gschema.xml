@@ -76,7 +76,7 @@
     </key>
     
     <key name="font-size" type="i">
-      <default>24</default>
+      <default>14</default>
       <summary>Font size</summary>
       <description>Font size in pixels</description>
       <range min="8" max="72"/>
