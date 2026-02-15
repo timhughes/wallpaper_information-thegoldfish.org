@@ -206,22 +206,34 @@ export default class WallpaperInfoExtension extends Extension {
         const margin = 48;
         let x, y;
         
+        // Get actual dimensions, considering preferred size if layout not complete
+        let width = this._mainContainer.width;
+        let height = this._mainContainer.height;
+        
+        // If width/height are 0, get preferred size
+        if (width === 0 || height === 0) {
+            let [minWidth, naturalWidth] = this._mainContainer.get_preferred_width(-1);
+            let [minHeight, naturalHeight] = this._mainContainer.get_preferred_height(-1);
+            width = naturalWidth || minWidth || 200; // fallback to 200 if still 0
+            height = naturalHeight || minHeight || 100; // fallback to 100 if still 0
+        }
+        
         // Calculate X position
         if (horizontalPos === 'left') {
             x = monitor.x + margin;
         } else if (horizontalPos === 'center') {
-            x = monitor.x + Math.floor((monitor.width - this._mainContainer.width) / 2);
+            x = monitor.x + Math.floor((monitor.width - width) / 2);
         } else { // right
-            x = monitor.x + monitor.width - this._mainContainer.width - margin;
+            x = monitor.x + monitor.width - width - margin;
         }
         
         // Calculate Y position
         if (verticalPos === 'top') {
             y = monitor.y + margin;
         } else if (verticalPos === 'middle') {
-            y = monitor.y + Math.floor((monitor.height - this._mainContainer.height) / 2);
+            y = monitor.y + Math.floor((monitor.height - height) / 2);
         } else { // bottom
-            y = monitor.y + monitor.height - this._mainContainer.height - margin;
+            y = monitor.y + monitor.height - height - margin;
         }
         
         return [x, y];
@@ -338,12 +350,13 @@ export default class WallpaperInfoExtension extends Extension {
         // Update visibility
         this._updateItemVisibility();
 
-        // Set initial position
+        // Add to background group to appear behind windows but on top of wallpaper
+        // This must be done before calculating position to ensure layout is complete
+        Main.layoutManager._backgroundGroup.add_child(this._mainContainer);
+        
+        // Set initial position after adding to stage so layout is complete
         let [x, y] = this._calculatePosition(monitor);
         this._mainContainer.set_position(x, y);
-
-        // Add to background group to appear behind windows but on top of wallpaper
-        Main.layoutManager._backgroundGroup.add_child(this._mainContainer);
         
         // Initialize network monitoring for event-based updates
         this._initNetworkMonitoring();
