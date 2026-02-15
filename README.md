@@ -6,6 +6,8 @@ A GNOME Shell extension that displays system information overlaid on your deskto
 
 This extension displays system information as a transparent overlay on the desktop of the primary monitor. It shows useful system information including:
 
+- Linux distribution name and version (from `/etc/os-release`)
+- Distribution logo (automatically detected)
 - Hostname
 - Last Boot Time (instead of uptime)
 - IP address(es)
@@ -20,6 +22,8 @@ The information is displayed in a customizable semi-transparent box and updates 
 ## Features
 
 - **Fully configurable**: Comprehensive preferences UI to customize every aspect
+- **OS information**: Displays Linux distribution name, version, and logo from `/etc/os-release`
+- **Distribution logo**: Automatically detects and displays your distro's logo
 - **Flexible positioning**: Choose from 9 positions (top/middle/bottom × left/center/right)
 - **Customizable appearance**: Font family, size, color, background color, border radius, and padding
 - **Toggle information items**: Show or hide any information item individually
@@ -78,6 +82,8 @@ This gives you 9 possible positions to place the information display.
 ### Information Items
 
 Toggle which information to display:
+- ✓ Distribution Name
+- ✓ Distribution Version
 - ✓ Hostname
 - ✓ Boot Time
 - ✓ IP Address
@@ -96,14 +102,27 @@ Customize the look and feel:
 - **Border Radius**: Set corner roundness from 0 to 50 pixels
 - **Padding**: Set internal spacing from 0 to 50 pixels
 
-### Company Logo
+### Logos
 
+#### Company Logo
 Add a custom logo to your display:
 - **Enable/Disable**: Toggle logo display on or off
 - **Logo File**: Choose an image file (PNG, JPEG, or SVG)
 - **Logo Size**: Set logo size from 16 to 256 pixels
 
-The logo appears at the top of the information display when enabled.
+The company logo appears at the top of the information display when enabled.
+
+#### Distribution Logo
+Display your Linux distribution logo automatically:
+- **Enable/Disable**: Toggle distro logo display on or off
+- **Automatic Detection**: Reads LOGO field from `/etc/os-release`
+- **Icon Lookup**: Searches system icon theme and common locations:
+  - Icon theme (e.g., `ubuntu-logo`, `fedora-logo-icon`)
+  - `/usr/share/pixmaps/`
+  - `/usr/share/icons/`
+- **Shared Size**: Uses the same size setting as company logo
+
+The distribution logo appears after the company logo (or at the top if no company logo is set).
 
 ## Customization
 
@@ -149,6 +168,8 @@ this._timeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 30, () => {
 1. The extension creates a container-based layout using `St.BoxLayout` with styling from `stylesheet.css`
 2. Each information item is in its own `St.Label` container for independent control
 3. It gathers system information using native Linux APIs:
+   - OS information from `/etc/os-release` (NAME, VERSION, LOGO)
+   - Distribution logo from icon theme or common pixmap locations
    - Hostname from `GLib.get_host_name()`
    - Boot time from `/proc/uptime`
    - Kernel version from `/proc/version`
@@ -181,6 +202,8 @@ this._timeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 30, () => {
 
 ## Changes from Previous Version
 
+- ✅ **OS release information**: Display Linux distribution name, version, and logo from `/etc/os-release`
+- ✅ **Distribution logo**: Automatic distro logo detection and display
 - ✅ **Fully configurable**: Added comprehensive preferences UI with GSettings
 - ✅ **Flexible positioning**: 9 position options (3×3 grid)
 - ✅ **Customizable appearance**: Font, colors, size, padding, and border radius
