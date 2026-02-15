@@ -9,11 +9,7 @@ import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-
-let infobox;
-let timeoutId;
-let nmProxy;
-let nmSignalId;
+import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 // Get system information using native APIs
 function getSystemInfo() {
@@ -111,90 +107,103 @@ function formatSystemInfo(info) {
     return lines.join('\n');
 }
 
-// Update the infobox with current system information
-function updateInfobox() {
-    if (infobox) {
-        let info = getSystemInfo();
-        infobox.text = formatSystemInfo(info);
+export default class WallpaperInfoExtension extends Extension {
+    constructor(metadata) {
+        super(metadata);
+        this._infobox = null;
+        this._timeoutId = null;
+        this._nmProxy = null;
+        this._nmSignalId = null;
     }
-    return GLib.SOURCE_CONTINUE;
-}
 
-// Initialize NetworkManager DBus proxy for network change notifications
-function initNetworkMonitoring() {
-    try {
-        nmProxy = Gio.DBusProxy.new_for_bus_sync(
-            Gio.BusType.SYSTEM,
-            Gio.DBusProxyFlags.NONE,
-            null,
-            'org.freedesktop.NetworkManager',
-            '/org/freedesktop/NetworkManager',
-            'org.freedesktop.NetworkManager',
-            null
-        );
+    // Initialize NetworkManager DBus proxy for network change notifications
+    _initNetworkMonitoring() {
+        try {
+            this._nmProxy = Gio.DBusProxy.new_for_bus_sync(
+                Gio.BusType.SYSTEM,
+                Gio.DBusProxyFlags.NONE,
+                null,
+                'org.freedesktop.NetworkManager',
+                '/org/freedesktop/NetworkManager',
+                'org.freedesktop.NetworkManager',
+                null
+            );
+            
+            // Listen for state changes
+            this._nmSignalId = this._nmProxy.connect('g-properties-changed', () => {
+                // Network state changed, update the display
+                this._updateInfobox();
+            });
+        } catch (e) {
+            logError(e, 'Failed to initialize NetworkManager monitoring');
+        }
+    }
+
+    // Clean up NetworkManager monitoring
+    _cleanupNetworkMonitoring() {
+        if (this._nmSignalId && this._nmProxy) {
+            this._nmProxy.disconnect(this._nmSignalId);
+            this._nmSignalId = null;
+        }
+        this._nmProxy = null;
+    }
+
+    // Update the infobox with current system information
+    _updateInfobox() {
+        if (this._infobox) {
+            let info = getSystemInfo();
+            this._infobox.text = formatSystemInfo(info);
+        }
+        return GLib.SOURCE_CONTINUE;
+    }
+
+    _createInfobox() {
+        let monitor = Main.layoutManager.primaryMonitor;
+
+        if (!this._infobox) {
+            this._infobox = new St.Label({ style_class: 'infobox-label', text: '' });
+        }
+
+        // Initial update
+        this._updateInfobox();
+
+        this._infobox.set_position(monitor.x + Math.floor(48),
+                          monitor.y + Math.floor(64));
+
+        // Add to background group to appear behind windows but on top of wallpaper
+        // Note: _backgroundGroup is an internal API but is the standard way to add desktop overlays
+        Main.layoutManager._backgroundGroup.add_child(this._infobox);
         
-        // Listen for state changes
-        nmSignalId = nmProxy.connect('g-properties-changed', () => {
-            // Network state changed, update the display
-            updateInfobox();
+        // Initialize network monitoring for event-based updates
+        this._initNetworkMonitoring();
+        
+        // Still poll periodically for boot time and other info (every 30 seconds instead of 1)
+        this._timeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 30, () => {
+            return this._updateInfobox();
         });
-    } catch (e) {
-        logError(e, 'Failed to initialize NetworkManager monitoring');
-    }
-}
-
-// Clean up NetworkManager monitoring
-function cleanupNetworkMonitoring() {
-    if (nmSignalId && nmProxy) {
-        nmProxy.disconnect(nmSignalId);
-        nmSignalId = null;
-    }
-    nmProxy = null;
-}
-
-function createInfobox() {
-    let monitor = Main.layoutManager.primaryMonitor;
-
-    if (!infobox) {
-        infobox = new St.Label({ style_class: 'infobox-label', text: '' });
     }
 
-    // Initial update
-    updateInfobox();
-
-    infobox.set_position(monitor.x + Math.floor(48),
-                      monitor.y + Math.floor(64));
-
-    // Add to background group to appear behind windows but on top of wallpaper
-    // Note: _backgroundGroup is an internal API but is the standard way to add desktop overlays
-    Main.layoutManager._backgroundGroup.add_child(infobox);
-    
-    // Initialize network monitoring for event-based updates
-    initNetworkMonitoring();
-    
-    // Still poll periodically for boot time and other info (every 30 seconds instead of 1)
-    timeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 30, updateInfobox);
-}
-
-export function init() {
-    // Extension initialization
-}
-
-export function enable() {
-    createInfobox();
-}
-
-export function disable() {
-    if (timeoutId) {
-        GLib.Source.remove(timeoutId);
-        timeoutId = null;
+    init() {
+        // Extension initialization - required by GNOME Shell Extension API
+        // Actual initialization happens in the constructor
     }
-    
-    cleanupNetworkMonitoring();
-    
-    if (infobox) {
-        Main.layoutManager._backgroundGroup.remove_child(infobox);
-        infobox.destroy();
-        infobox = null;
+
+    enable() {
+        this._createInfobox();
+    }
+
+    disable() {
+        if (this._timeoutId) {
+            GLib.Source.remove(this._timeoutId);
+            this._timeoutId = null;
+        }
+        
+        this._cleanupNetworkMonitoring();
+        
+        if (this._infobox) {
+            Main.layoutManager._backgroundGroup.remove_child(this._infobox);
+            this._infobox.destroy();
+            this._infobox = null;
+        }
     }
 }
