@@ -12,7 +12,10 @@ This extension displays system information as a transparent overlay on the deskt
 - Last Boot Time (instead of uptime)
 - IP address(es)
 - Kernel version
+- Hardware Vendor, Model, and Firmware Version
+- OS Support End date and remaining time
 - Chassis asset tag (from DMI)
+- System serial number (from DMI)
 - Company logo (optional)
 
 The information is displayed in a customizable semi-transparent box and updates intelligently:
@@ -88,7 +91,13 @@ Toggle which information to display:
 - ✓ Boot Time
 - ✓ IP Address
 - ✓ Kernel Version
+- ✓ Hardware Vendor
+- ✓ Hardware Model
+- ✓ Firmware Version
+- ✓ OS Support End
+- ✓ OS Support Remaining
 - ✓ Asset Tag
+- ✓ Serial Number
 
 Each item can be individually enabled or disabled.
 
@@ -175,6 +184,7 @@ this._timeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 30, () => {
    - Kernel version from `/proc/version`
    - IP addresses from `hostname -I` command
    - Asset tag from `/sys/class/dmi/id/chassis_asset_tag`
+   - Serial number from `/sys/class/dmi/id/product_serial`
 4. The container is positioned on the primary monitor based on user preferences
 5. The container is inserted into the background group layer (behind windows, but on top of wallpaper)
 6. Network information updates automatically when NetworkManager detects changes (via DBus)

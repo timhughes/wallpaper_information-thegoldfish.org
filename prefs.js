@@ -9,24 +9,27 @@
 import Adw from 'gi://Adw';
 import Gtk from 'gi://Gtk';
 import Gio from 'gi://Gio';
+import Gdk from 'gi://Gdk';
+import Pango from 'gi://Pango';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 export default class WallpaperInfoPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings('org.gnome.shell.extensions.wallpaper-information');
         
-        // Position Page
-        const positionPage = new Adw.PreferencesPage({
-            title: 'Position',
-            icon_name: 'preferences-desktop-display-symbolic'
+        // Appearance Page (Combined Position and Appearance)
+        const appearancePage = new Adw.PreferencesPage({
+            title: 'Appearance',
+            icon_name: 'applications-graphics-symbolic'
         });
-        window.add(positionPage);
-        
+        window.add(appearancePage);
+
+        // Position Group
         const positionGroup = new Adw.PreferencesGroup({
             title: 'Display Position',
             description: 'Choose where the information box appears on screen'
         });
-        positionPage.add(positionGroup);
+        appearancePage.add(positionGroup);
         
         // Vertical position
         const verticalRow = new Adw.ComboRow({
@@ -68,46 +71,6 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         });
         positionGroup.add(horizontalRow);
         
-        // Information Items Page
-        const infoPage = new Adw.PreferencesPage({
-            title: 'Information',
-            icon_name: 'dialog-information-symbolic'
-        });
-        window.add(infoPage);
-        
-        const infoGroup = new Adw.PreferencesGroup({
-            title: 'Information Items',
-            description: 'Choose which information to display'
-        });
-        infoPage.add(infoGroup);
-        
-        // Toggle switches for each information item
-        const items = [
-            { key: 'show-distro-name', title: 'Distribution Name', subtitle: 'Display the Linux distribution name' },
-            { key: 'show-distro-version', title: 'Distribution Version', subtitle: 'Display the Linux distribution version' },
-            { key: 'show-hostname', title: 'Hostname', subtitle: 'Display the system hostname' },
-            { key: 'show-boot-time', title: 'Boot Time', subtitle: 'Display when the system was last booted' },
-            { key: 'show-ip-address', title: 'IP Address', subtitle: 'Display network IP addresses' },
-            { key: 'show-kernel', title: 'Kernel Version', subtitle: 'Display the Linux kernel version' },
-            { key: 'show-asset-tag', title: 'Asset Tag', subtitle: 'Display the chassis asset tag' }
-        ];
-        
-        items.forEach(item => {
-            const row = new Adw.SwitchRow({
-                title: item.title,
-                subtitle: item.subtitle
-            });
-            settings.bind(item.key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
-            infoGroup.add(row);
-        });
-        
-        // Appearance Page
-        const appearancePage = new Adw.PreferencesPage({
-            title: 'Appearance',
-            icon_name: 'applications-graphics-symbolic'
-        });
-        window.add(appearancePage);
-        
         // Font Settings Group
         const fontGroup = new Adw.PreferencesGroup({
             title: 'Font Settings',
@@ -115,33 +78,63 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         });
         appearancePage.add(fontGroup);
         
-        // Font family
-        const fontFamilyRow = new Adw.EntryRow({
-            title: 'Font Family',
+        // Font settings
+        const fontRow = new Adw.ActionRow({
+            title: 'Font',
+            subtitle: 'Choose the font and size'
         });
-        settings.bind('font-family', fontFamilyRow, 'text', Gio.SettingsBindFlags.DEFAULT);
-        fontGroup.add(fontFamilyRow);
         
-        // Font size
-        const fontSizeRow = new Adw.SpinRow({
-            title: 'Font Size',
-            subtitle: 'Size in pixels',
-            adjustment: new Gtk.Adjustment({
-                lower: 8,
-                upper: 72,
-                step_increment: 1,
-                page_increment: 5
-            })
+        const fontDialog = new Gtk.FontDialog();
+        const fontButton = new Gtk.FontDialogButton({
+            dialog: fontDialog,
+            valign: Gtk.Align.CENTER
         });
-        settings.bind('font-size', fontSizeRow, 'value', Gio.SettingsBindFlags.DEFAULT);
-        fontGroup.add(fontSizeRow);
+
+        // Initialize button with current font
+        const initialFamily = settings.get_string('font-family');
+        const initialSize = settings.get_int('font-size');
+        fontButton.font_desc = Pango.FontDescription.from_string(`${initialFamily} ${initialSize}`);
+
+        fontButton.connect('notify::font-desc', () => {
+            const desc = fontButton.font_desc;
+            const family = desc.get_family();
+            const size = desc.get_size() / Pango.SCALE;
+            
+            if (family)
+                settings.set_string('font-family', family);
+            if (size > 0)
+                settings.set_int('font-size', size);
+        });
+
+        fontRow.add_suffix(fontButton);
+        fontGroup.add(fontRow);
         
         // Font color
-        const fontColorRow = new Adw.EntryRow({
+        const fontColorRow = new Adw.ActionRow({
             title: 'Font Color',
-            placeholder_text: '#ffffff'
+            subtitle: 'Choose the color for the information text'
         });
-        settings.bind('font-color', fontColorRow, 'text', Gio.SettingsBindFlags.DEFAULT);
+        
+        const fontColorDialog = new Gtk.ColorDialog({
+            with_alpha: true
+        });
+        
+        const fontColorButton = new Gtk.ColorDialogButton({
+            dialog: fontColorDialog,
+            valign: Gtk.Align.CENTER
+        });
+
+        // Initialize button with current color
+        const currentFontColor = new Gdk.RGBA();
+        if (currentFontColor.parse(settings.get_string('font-color'))) {
+            fontColorButton.rgba = currentFontColor;
+        }
+
+        fontColorButton.connect('notify::rgba', () => {
+            settings.set_string('font-color', fontColorButton.rgba.to_string());
+        });
+
+        fontColorRow.add_suffix(fontColorButton);
         fontGroup.add(fontColorRow);
         
         // Background Settings Group
@@ -152,11 +145,31 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         appearancePage.add(bgGroup);
         
         // Background color
-        const bgColorRow = new Adw.EntryRow({
+        const bgColorRow = new Adw.ActionRow({
             title: 'Background Color',
-            placeholder_text: 'rgba(10,10,10,0.5)'
+            subtitle: 'Choose the background color and transparency'
         });
-        settings.bind('background-color', bgColorRow, 'text', Gio.SettingsBindFlags.DEFAULT);
+        
+        const bgColorDialog = new Gtk.ColorDialog({
+            with_alpha: true
+        });
+        
+        const bgColorButton = new Gtk.ColorDialogButton({
+            dialog: bgColorDialog,
+            valign: Gtk.Align.CENTER
+        });
+
+        // Initialize button with current color
+        const currentBgColor = new Gdk.RGBA();
+        if (currentBgColor.parse(settings.get_string('background-color'))) {
+            bgColorButton.rgba = currentBgColor;
+        }
+
+        bgColorButton.connect('notify::rgba', () => {
+            settings.set_string('background-color', bgColorButton.rgba.to_string());
+        });
+
+        bgColorRow.add_suffix(bgColorButton);
         bgGroup.add(bgColorRow);
         
         // Border radius
@@ -187,6 +200,45 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         settings.bind('padding', paddingRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         bgGroup.add(paddingRow);
         
+        // Information Items Page
+        const infoPage = new Adw.PreferencesPage({
+            title: 'Information',
+            icon_name: 'dialog-information-symbolic'
+        });
+        window.add(infoPage);
+        
+        const infoGroup = new Adw.PreferencesGroup({
+            title: 'Information Items',
+            description: 'Choose which information to display'
+        });
+        infoPage.add(infoGroup);
+        
+        // Toggle switches for each information item
+        const items = [
+            { key: 'show-distro-name', title: 'Distribution Name', subtitle: 'Display the Linux distribution name' },
+            { key: 'show-distro-version', title: 'Distribution Version', subtitle: 'Display the Linux distribution version' },
+            { key: 'show-hostname', title: 'Hostname', subtitle: 'Display the system hostname' },
+            { key: 'show-boot-time', title: 'Boot Time', subtitle: 'Display when the system was last booted' },
+            { key: 'show-kernel', title: 'Kernel Version', subtitle: 'Display the Linux kernel version' },
+            { key: 'show-hardware-vendor', title: 'Hardware Vendor', subtitle: 'Display the hardware manufacturer' },
+            { key: 'show-hardware-model', title: 'Hardware Model', subtitle: 'Display the hardware model name' },
+            { key: 'show-firmware-version', title: 'Firmware Version', subtitle: 'Display the BIOS/UEFI firmware version' },
+            { key: 'show-os-support-end', title: 'OS Support End', subtitle: 'Display when the OS support ends' },
+            { key: 'show-os-support-remaining', title: 'OS Support Remaining', subtitle: 'Display time remaining for OS support' },
+            { key: 'show-asset-tag', title: 'Asset Tag', subtitle: 'Display the chassis asset tag' },
+            { key: 'show-serial-number', title: 'Serial Number', subtitle: 'Display the system serial number' },
+            { key: 'show-ip-address', title: 'IP Address', subtitle: 'Display network IP addresses' }
+        ];
+        
+        items.forEach(item => {
+            const row = new Adw.SwitchRow({
+                title: item.title,
+                subtitle: item.subtitle
+            });
+            settings.bind(item.key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
+            infoGroup.add(row);
+        });
+        
         // Logo Page
         const logoPage = new Adw.PreferencesPage({
             title: 'Logo',
@@ -195,23 +247,23 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         window.add(logoPage);
         
         const logoGroup = new Adw.PreferencesGroup({
-            title: 'Company Logo',
-            description: 'Add a custom logo to the display'
+            title: 'Logo Settings',
+            description: 'Customize the logo display (defaults to distribution logo)'
         });
         logoPage.add(logoGroup);
         
         // Show logo toggle
         const showLogoRow = new Adw.SwitchRow({
             title: 'Show Logo',
-            subtitle: 'Display a company logo'
+            subtitle: 'Display a logo in the information box'
         });
         settings.bind('show-logo', showLogoRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         logoGroup.add(showLogoRow);
         
         // Logo path
         const logoPathRow = new Adw.ActionRow({
-            title: 'Logo File',
-            subtitle: 'Select an image file'
+            title: 'Custom Logo',
+            subtitle: 'Override distribution logo with a custom image'
         });
         
         const logoButton = new Gtk.Button({
@@ -249,9 +301,18 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
             
             dialog.show();
         });
+
+        const clearButton = new Gtk.Button({
+            icon_name: 'edit-clear-symbolic',
+            valign: Gtk.Align.CENTER
+        });
+        clearButton.connect('clicked', () => {
+            settings.set_string('logo-path', '');
+            logoPathRow.subtitle = 'Override distribution logo with a custom image';
+        });
         
         logoPathRow.add_suffix(logoButton);
-        logoPathRow.activatable_widget = logoButton;
+        logoPathRow.add_suffix(clearButton);
         
         const currentLogoPath = settings.get_string('logo-path');
         if (currentLogoPath) {
@@ -273,20 +334,39 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         });
         settings.bind('logo-size', logoSizeRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         logoGroup.add(logoSizeRow);
-        
-        // Distribution Logo Group
-        const distroLogoGroup = new Adw.PreferencesGroup({
-            title: 'Distribution Logo',
-            description: 'Display your Linux distribution logo (from /etc/os-release)'
+
+        // Logo border radius
+        const logoBorderRadiusRow = new Adw.SpinRow({
+            title: 'Logo Border Radius',
+            subtitle: 'Roundness of logo corners in pixels',
+            adjustment: new Gtk.Adjustment({
+                lower: 0,
+                upper: 128,
+                step_increment: 1,
+                page_increment: 5
+            })
         });
-        logoPage.add(distroLogoGroup);
+        settings.bind('logo-border-radius', logoBorderRadiusRow, 'value', Gio.SettingsBindFlags.DEFAULT);
+        logoGroup.add(logoBorderRadiusRow);
         
-        // Show distro logo toggle
-        const showDistroLogoRow = new Adw.SwitchRow({
-            title: 'Show Distribution Logo',
-            subtitle: 'Display the Linux distribution logo automatically'
+        // Logo alignment
+        const logoAlignRow = new Adw.ComboRow({
+            title: 'Logo Alignment',
+            subtitle: 'Horizontal alignment of the logo'
         });
-        settings.bind('show-distro-logo', showDistroLogoRow, 'active', Gio.SettingsBindFlags.DEFAULT);
-        distroLogoGroup.add(showDistroLogoRow);
+        const logoAlignModel = new Gtk.StringList();
+        logoAlignModel.append('Left');
+        logoAlignModel.append('Center');
+        logoAlignModel.append('Right');
+        logoAlignRow.model = logoAlignModel;
+        
+        const logoAlign = settings.get_string('logo-alignment');
+        logoAlignRow.selected = ['left', 'center', 'right'].indexOf(logoAlign);
+        
+        logoAlignRow.connect('notify::selected', (widget) => {
+            const selected = ['left', 'center', 'right'][widget.selected];
+            settings.set_string('logo-alignment', selected);
+        });
+        logoGroup.add(logoAlignRow);
     }
 }

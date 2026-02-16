@@ -68,6 +68,42 @@
       <description>Display the chassis asset tag</description>
     </key>
     
+    <key name="show-serial-number" type="b">
+      <default>true</default>
+      <summary>Show serial number</summary>
+      <description>Display the system serial number</description>
+    </key>
+    
+    <key name="show-hardware-vendor" type="b">
+      <default>true</default>
+      <summary>Show hardware vendor</summary>
+      <description>Display the hardware manufacturer</description>
+    </key>
+    
+    <key name="show-hardware-model" type="b">
+      <default>true</default>
+      <summary>Show hardware model</summary>
+      <description>Display the hardware model name</description>
+    </key>
+    
+    <key name="show-firmware-version" type="b">
+      <default>true</default>
+      <summary>Show firmware version</summary>
+      <description>Display the BIOS/UEFI firmware version</description>
+    </key>
+    
+    <key name="show-os-support-end" type="b">
+      <default>true</default>
+      <summary>Show OS support end</summary>
+      <description>Display the end of support date for the operating system</description>
+    </key>
+    
+    <key name="show-os-support-remaining" type="b">
+      <default>true</default>
+      <summary>Show OS support remaining</summary>
+      <description>Display the time remaining until OS support ends</description>
+    </key>
+    
     <!-- Font Settings -->
     <key name="font-family" type="s">
       <default>"Sans"</default>
@@ -110,15 +146,15 @@
     
     <!-- Logo Settings -->
     <key name="show-logo" type="b">
-      <default>false</default>
-      <summary>Show company logo</summary>
-      <description>Display a company logo</description>
+      <default>true</default>
+      <summary>Show logo</summary>
+      <description>Display a logo (defaults to distro logo, can be overridden by custom logo)</description>
     </key>
     
     <key name="logo-path" type="s">
       <default>""</default>
       <summary>Logo file path</summary>
-      <description>Path to the logo image file</description>
+      <description>Path to the custom logo image file. If empty, the distribution logo will be used.</description>
     </key>
     
     <key name="logo-size" type="i">
@@ -128,10 +164,22 @@
       <range min="16" max="256"/>
     </key>
     
-    <key name="show-distro-logo" type="b">
-      <default>true</default>
-      <summary>Show distribution logo</summary>
-      <description>Display the Linux distribution logo</description>
+    <key name="logo-border-radius" type="i">
+      <default>0</default>
+      <summary>Logo border radius</summary>
+      <description>Border radius for the logo in pixels</description>
+      <range min="0" max="128"/>
+    </key>
+
+    <key name="logo-alignment" type="s">
+      <default>"left"</default>
+      <summary>Logo alignment</summary>
+      <description>Horizontal alignment of logo: left, center, or right</description>
+      <choices>
+        <choice value="left"/>
+        <choice value="center"/>
+        <choice value="right"/>
+      </choices>
     </key>
     
   </schema>

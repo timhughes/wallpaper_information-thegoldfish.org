@@ -23,7 +23,8 @@ function getOSReleaseInfo() {
         name: 'N/A',
         version: 'N/A',
         pretty_name: 'N/A',
-        logo: null
+        logo: null,
+        id: null
     };
     
     try {
@@ -54,8 +55,15 @@ function getOSReleaseInfo() {
                         osInfo.pretty_name = value;
                     } else if (key === 'LOGO') {
                         osInfo.logo = value;
+                    } else if (key === 'ID' && !osInfo.logo) {
+                        osInfo.id = value;
                     }
                 }
+            }
+            
+            // Fallback logo to ID if LOGO is not present
+            if (!osInfo.logo && osInfo.id) {
+                osInfo.logo = osInfo.id;
             }
         }
     } catch (e) {
@@ -106,14 +114,135 @@ function getSystemInfo(osReleaseInfo = null) {
     // IP addresses from NetworkManager via DBus
     info.ipaddress = getNetworkInfo();
     
-    // DMI chassis asset tag
+    // DMI/DBus system information
     try {
-        let [ok, contents] = GLib.file_get_contents('/sys/class/dmi/id/chassis_asset_tag');
-        if (ok) {
-            info.chassis_asset_tag = new TextDecoder().decode(contents).trim();
+        const bus = Gio.DBus.system;
+        let props = {};
+
+        // Try Describe() first (available in systemd >= 253)
+        try {
+            const describeResult = bus.call_sync(
+                'org.freedesktop.hostname1',
+                '/org/freedesktop/hostname1',
+                'org.freedesktop.hostname1',
+                'Describe',
+                null,
+                null,
+                Gio.DBusCallFlags.NONE,
+                -1,
+                null
+            );
+            if (describeResult) {
+                const [jsonStr] = describeResult.deep_unpack();
+                props = JSON.parse(jsonStr);
+            }
+        } catch (e) {
+            // Fallback to GetAll
+            const result = bus.call_sync(
+                'org.freedesktop.hostname1',
+                '/org/freedesktop/hostname1',
+                'org.freedesktop.DBus.Properties',
+                'GetAll',
+                new GLib.Variant('(s)', ['org.freedesktop.hostname1']),
+                null,
+                Gio.DBusCallFlags.NONE,
+                -1,
+                null
+            );
+            const [rawProps] = result.deep_unpack();
+            for (let key in rawProps) {
+                props[key] = rawProps[key].unpack();
+            }
+        }
+        
+        info.hardware_vendor = props.HardwareVendor || 'N/A';
+        info.hardware_model = props.HardwareModel || 'N/A';
+        info.firmware_version = props.FirmwareVersion || 'N/A';
+        info.chassis_asset_tag = props.ChassisAssetTag || 'N/A';
+        
+        if (props.HardwareSerial) {
+            info.product_serial = props.HardwareSerial;
+        }
+
+        if (props.KernelRelease) {
+            info.kernelversion = props.KernelRelease;
+        }
+
+        if (props.PrettyHostname || props.StaticHostname) {
+            info.hostname = props.PrettyHostname || props.StaticHostname;
+        }
+
+        if (props.OperatingSystemPrettyName) {
+            info.distro_pretty_name = props.OperatingSystemPrettyName;
+        }
+        
+        // OS Support Info
+        if (props.OperatingSystemSupportEnd) {
+            // Convert microseconds to milliseconds
+            const supportEndMs = Number(props.OperatingSystemSupportEnd) / 1000;
+            const endDate = new Date(supportEndMs);
+            info.os_support_end = endDate.toLocaleDateString();
+            
+            const now = Date.now();
+            const diffMs = supportEndMs - now;
+            
+            if (diffMs > 0) {
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                const years = Math.floor(diffDays / 365);
+                const months = Math.floor((diffDays % 365) / 30);
+                const days = diffDays % 30;
+                
+                let remaining = [];
+                if (years > 0) remaining.push(`${years}y`);
+                if (months > 0) remaining.push(`${months}m`);
+                if (days > 0 || remaining.length === 0) remaining.push(`${days}d`);
+                
+                info.os_support_remaining = remaining.join(' ');
+            } else {
+                info.os_support_remaining = 'Ended';
+            }
+        } else {
+            info.os_support_end = 'N/A';
+            info.os_support_remaining = 'N/A';
         }
     } catch (e) {
-        info.chassis_asset_tag = 'N/A';
+        // Fallback to DMI files if DBus fails
+        try {
+            let [ok, contents] = GLib.file_get_contents('/sys/class/dmi/id/chassis_asset_tag');
+            info.chassis_asset_tag = ok ? new TextDecoder().decode(contents).trim() : 'N/A';
+        } catch (e2) {
+            info.chassis_asset_tag = 'N/A';
+        }
+
+        try {
+            let [ok, contents] = GLib.file_get_contents('/sys/class/dmi/id/sys_vendor');
+            info.hardware_vendor = ok ? new TextDecoder().decode(contents).trim() : 'N/A';
+        } catch (e2) {
+            info.hardware_vendor = 'N/A';
+        }
+
+        try {
+            let [ok, contents] = GLib.file_get_contents('/sys/class/dmi/id/product_name');
+            info.hardware_model = ok ? new TextDecoder().decode(contents).trim() : 'N/A';
+        } catch (e2) {
+            info.hardware_model = 'N/A';
+        }
+
+        info.firmware_version = 'N/A';
+        info.os_support_end = 'N/A';
+        info.os_support_remaining = 'N/A';
+    }
+
+    // DMI product serial (fallback if not already set from DBus)
+    if (!info.product_serial || info.product_serial === 'N/A') {
+        try {
+            let [ok, contents] = GLib.file_get_contents('/sys/class/dmi/id/product_serial');
+            if (ok) {
+                info.product_serial = new TextDecoder().decode(contents).trim();
+            }
+        } catch (e) {
+            info.product_serial = 'N/A';
+        }
     }
     
     return info;
@@ -152,7 +281,7 @@ function getNetworkInfo() {
         }
     }
     
-    return ips.length > 0 ? ips.join(', ') : 'N/A';
+    return ips;
 }
 
 // Information item definition
@@ -165,17 +294,73 @@ class InfoItem {
     }
     
     createContainer(settings) {
-        this.container = new St.Label({
-            style_class: 'info-item',
-            text: ''
+        this.container = new St.BoxLayout({
+            style_class: 'info-row',
+            vertical: false
         });
+
+        this._labelWidget = new St.Label({
+            text: `${this.label}:`,
+            style_class: 'info-label',
+            y_align: Clutter.ActorAlign.START
+        });
+        
+        this._valuesContainer = new St.BoxLayout({
+            vertical: true,
+            style_class: 'info-values-container',
+            y_align: Clutter.ActorAlign.START
+        });
+
+        this.container.add_child(this._labelWidget);
+        this.container.add_child(this._valuesContainer);
+
         return this.container;
     }
     
     update(info) {
         if (this.container) {
             const value = this.getValue(info);
-            this.container.text = `${this.label}: ${value}`;
+            
+            // Remove old values
+            this._valuesContainer.get_children().forEach(c => c.destroy());
+            
+            if (Array.isArray(value)) {
+                if (value.length > 0) {
+                    value.forEach(v => {
+                        let label = new St.Label({
+                            text: v,
+                            style_class: 'info-value'
+                        });
+                        this._valuesContainer.add_child(label);
+                    });
+                } else {
+                    let label = new St.Label({
+                        text: 'N/A',
+                        style_class: 'info-value'
+                    });
+                    this._valuesContainer.add_child(label);
+                }
+            } else {
+                let label = new St.Label({
+                    text: (value !== null && value !== undefined) ? String(value) : 'N/A',
+                    style_class: 'info-value'
+                });
+                this._valuesContainer.add_child(label);
+            }
+        }
+    }
+
+    getLabelPreferredWidth() {
+        if (this._labelWidget) {
+            let [minWidth, naturalWidth] = this._labelWidget.get_preferred_width(-1);
+            return naturalWidth;
+        }
+        return 0;
+    }
+
+    setLabelWidth(width) {
+        if (this._labelWidget) {
+            this._labelWidget.width = width;
         }
     }
     
@@ -191,7 +376,6 @@ export default class WallpaperInfoExtension extends Extension {
         super(metadata);
         this._mainContainer = null;
         this._logoContainer = null;
-        this._distroLogoContainer = null;
         this._osReleaseInfo = null;  // Cache OS release info
         this._timeoutId = null;
         this._nmProxy = null;
@@ -206,22 +390,34 @@ export default class WallpaperInfoExtension extends Extension {
             'distro-version': 'show-distro-version',
             'hostname': 'show-hostname',
             'boot-time': 'show-boot-time',
-            'ip-address': 'show-ip-address',
             'kernel': 'show-kernel',
-            'asset-tag': 'show-asset-tag'
+            'asset-tag': 'show-asset-tag',
+            'serial-number': 'show-serial-number',
+            'hardware-vendor': 'show-hardware-vendor',
+            'hardware-model': 'show-hardware-model',
+            'firmware-version': 'show-firmware-version',
+            'os-support-end': 'show-os-support-end',
+            'os-support-remaining': 'show-os-support-remaining',
+            'ip-address': 'show-ip-address'
         };
     }
     
     // Create information items
     _createInfoItems() {
         return [
-            new InfoItem('distro-name', 'Distribution', (info) => info.distro_name),
+            new InfoItem('distro-name', 'Distribution', (info) => info.distro_pretty_name || info.distro_name),
             new InfoItem('distro-version', 'Version', (info) => info.distro_version),
             new InfoItem('hostname', 'Hostname', (info) => info.hostname),
             new InfoItem('boot-time', 'Boot Time', (info) => info.boot_time),
-            new InfoItem('ip-address', 'IP Address', (info) => info.ipaddress),
             new InfoItem('kernel', 'Kernel', (info) => info.kernelversion),
-            new InfoItem('asset-tag', 'Asset Tag', (info) => info.chassis_asset_tag)
+            new InfoItem('hardware-vendor', 'Hardware Vendor', (info) => info.hardware_vendor),
+            new InfoItem('hardware-model', 'Hardware Model', (info) => info.hardware_model),
+            new InfoItem('firmware-version', 'Firmware Version', (info) => info.firmware_version),
+            new InfoItem('os-support-end', 'OS Support End', (info) => info.os_support_end),
+            new InfoItem('os-support-remaining', 'OS Support Remaining', (info) => info.os_support_remaining),
+            new InfoItem('asset-tag', 'Asset Tag', (info) => info.chassis_asset_tag),
+            new InfoItem('serial-number', 'Serial Number', (info) => info.product_serial),
+            new InfoItem('ip-address', 'IP Address', (info) => info.ipaddress)
         ];
     }
 
@@ -268,9 +464,8 @@ export default class WallpaperInfoExtension extends Extension {
                 item.update(info);
             });
             
-            // Update logos if needed
+            // Update logo
             this._updateLogo();
-            this._updateDistroLogo();
         }
         return GLib.SOURCE_CONTINUE;
     }
@@ -353,110 +548,85 @@ export default class WallpaperInfoExtension extends Extension {
         const showLogo = this._settings.get_boolean('show-logo');
         const logoPath = this._settings.get_string('logo-path');
         const logoSize = this._settings.get_int('logo-size');
+        const logoBorderRadius = this._settings.get_int('logo-border-radius');
+        const logoAlignment = this._settings.get_string('logo-alignment');
         
-        // Remove existing logo if we need to hide it or recreate it
-        // Note: We recreate the logo instead of updating properties for simplicity,
-        // as logo changes are infrequent and the overhead is minimal
+        // Remove existing logo if present
         if (this._logoContainer) {
             this._logoContainer.destroy();
             this._logoContainer = null;
         }
         
-        // Create new logo if enabled and path is valid
-        if (showLogo && logoPath && logoPath.length > 0) {
+        if (!showLogo) return;
+
+        let align = Clutter.ActorAlign.START;
+        if (logoAlignment === 'center') {
+            align = Clutter.ActorAlign.CENTER;
+        } else if (logoAlignment === 'right') {
+            align = Clutter.ActorAlign.END;
+        }
+
+        let icon = null;
+
+        // Try custom logo first
+        if (logoPath && logoPath.length > 0) {
             try {
                 const file = Gio.File.new_for_path(logoPath);
                 if (file.query_exists(null)) {
-                    const icon = new St.Icon({
+                    icon = new St.Icon({
                         gicon: Gio.icon_new_for_string(logoPath),
-                        icon_size: logoSize,
-                        style_class: 'logo-icon'
+                        icon_size: logoSize
                     });
-                    
-                    // Insert logo at the beginning of the container
-                    this._mainContainer.insert_child_at_index(icon, 0);
-                    this._logoContainer = icon;
                 }
             } catch (e) {
-                logError(e, 'Failed to load logo');
+                logError(e, 'Failed to load custom logo');
             }
         }
-    }
-    
-    // Get the insertion index for logo items (after company logo if present)
-    // Returns 1 to insert after company logo, or 0 to insert at the beginning
-    _getLogoInsertIndex() {
-        return this._logoContainer ? 1 : 0;
-    }
-    
-    // Update distro logo display
-    _updateDistroLogo() {
-        const showDistroLogo = this._settings.get_boolean('show-distro-logo');
-        
-        // Remove existing distro logo if present
-        if (this._distroLogoContainer) {
-            this._distroLogoContainer.destroy();
-            this._distroLogoContainer = null;
-        }
-        
-        if (showDistroLogo) {
-            // Use cached OS release info if available
+
+        // Fallback to distro logo if no custom logo was loaded
+        if (!icon) {
             if (!this._osReleaseInfo) {
                 this._osReleaseInfo = getOSReleaseInfo();
             }
             
             if (this._osReleaseInfo.logo) {
                 try {
-                    // Try to find the logo icon in the icon theme
-                    // GNOME's icon theme will search standard locations like /usr/share/pixmaps
-                    const iconTheme = St.IconTheme.get_default();
-                    
-                    // Check if icon exists in theme
-                    if (iconTheme.has_icon(this._osReleaseInfo.logo)) {
-                        const logoSize = this._settings.get_int('logo-size');
-                        const icon = new St.Icon({
-                            icon_name: this._osReleaseInfo.logo,
-                            icon_size: logoSize,
-                            style_class: 'logo-icon'
-                        });
-                        
-                        // Insert distro logo after company logo (or at beginning if no company logo)
-                        this._mainContainer.insert_child_at_index(icon, this._getLogoInsertIndex());
-                        this._distroLogoContainer = icon;
-                    } else {
-                        // Try common locations for distro logos
-                        let logoPath = null;
-                        const possiblePaths = [
-                            `/usr/share/pixmaps/${this._osReleaseInfo.logo}.svg`,
-                            `/usr/share/pixmaps/${this._osReleaseInfo.logo}.png`,
-                            `/usr/share/icons/hicolor/scalable/apps/${this._osReleaseInfo.logo}.svg`,
-                            `/usr/share/icons/hicolor/128x128/apps/${this._osReleaseInfo.logo}.png`
-                        ];
-                        
-                        for (let path of possiblePaths) {
-                            const file = Gio.File.new_for_path(path);
-                            if (file.query_exists(null)) {
-                                logoPath = path;
-                                break;
-                            }
-                        }
-                        
-                        if (logoPath) {
-                            const logoSize = this._settings.get_int('logo-size');
-                            const icon = new St.Icon({
-                                gicon: Gio.icon_new_for_string(logoPath),
-                                icon_size: logoSize,
-                                style_class: 'logo-icon'
-                            });
-                            
-                            this._mainContainer.insert_child_at_index(icon, this._getLogoInsertIndex());
-                            this._distroLogoContainer = icon;
-                        }
-                    }
+                    icon = new St.Icon({
+                        icon_name: this._osReleaseInfo.logo,
+                        icon_size: logoSize,
+                        fallback_icon_name: 'start-here-symbolic'
+                    });
                 } catch (e) {
                     logError(e, 'Failed to load distro logo');
                 }
             }
+        }
+
+        if (icon) {
+            let finalWidget = icon;
+            if (logoBorderRadius > 0) {
+                // Wrap in a Bin to ensure clipping works as expected
+                finalWidget = new St.Bin({
+                    child: icon,
+                    style: `border-radius: ${logoBorderRadius}px; overflow: hidden;`,
+                    x_align: align,
+                    x_expand: true
+                });
+                // Reset icon alignment/expand since it's now inside a Bin
+                icon.x_align = Clutter.ActorAlign.CENTER;
+                icon.x_expand = false;
+            } else {
+                // Apply alignment to icon directly if not wrapped
+                icon.x_align = align;
+                icon.x_expand = true;
+            }
+
+            // Apply consistent margin to whichever widget is in the main container
+            finalWidget.add_style_class_name('logo-container');
+            
+            // Insert logo at the beginning of the container
+            this._mainContainer.insert_child_at_index(finalWidget, 0);
+            this._logoContainer = finalWidget;
         }
     }
     
@@ -469,6 +639,37 @@ export default class WallpaperInfoExtension extends Extension {
                 item.setVisible(visible);
             }
         });
+        this._updateLabelWidths();
+    }
+
+    _updateLabelWidths() {
+        let maxWidth = 0;
+        
+        // Reset widths first to get natural widths
+        this._infoItems.forEach(item => {
+            if (item.container && item.container.visible) {
+                item.setLabelWidth(-1);
+            }
+        });
+
+        // Find max natural width among visible items
+        this._infoItems.forEach(item => {
+            if (item.container && item.container.visible) {
+                let width = item.getLabelPreferredWidth();
+                if (width > maxWidth) {
+                    maxWidth = width;
+                }
+            }
+        });
+        
+        // Apply max width to all visible items to keep them aligned
+        if (maxWidth > 0) {
+            this._infoItems.forEach(item => {
+                if (item.container && item.container.visible) {
+                    item.setLabelWidth(maxWidth);
+                }
+            });
+        }
     }
 
     _createInfobox() {
@@ -501,6 +702,9 @@ export default class WallpaperInfoExtension extends Extension {
         // Add to background group to appear behind windows but on top of wallpaper
         // This must be done before calculating position to ensure layout is complete
         Main.layoutManager._backgroundGroup.add_child(this._mainContainer);
+        
+        // Recalculate label widths now that we are on stage
+        this._updateLabelWidths();
         
         // Set initial position after adding to stage so layout is complete
         let [x, y] = this._calculatePosition(monitor);
@@ -537,25 +741,19 @@ export default class WallpaperInfoExtension extends Extension {
         styleKeys.forEach(key => {
             let signal = this._settings.connect(`changed::${key}`, () => {
                 this._applyStyles();
+                this._updateLabelWidths();
             });
             this._settingsSignals.push(signal);
         });
         
-        // Logo changes (affects both company and distro logo size)
-        let logoKeys = ['show-logo', 'logo-path', 'logo-size'];
+        // Logo changes
+        let logoKeys = ['show-logo', 'logo-path', 'logo-size', 'logo-border-radius', 'logo-alignment'];
         logoKeys.forEach(key => {
             let signal = this._settings.connect(`changed::${key}`, () => {
                 this._updateLogo();
-                this._updateDistroLogo();
             });
             this._settingsSignals.push(signal);
         });
-        
-        // Distro logo changes
-        let distroLogoSignal = this._settings.connect('changed::show-distro-logo', () => {
-            this._updateDistroLogo();
-        });
-        this._settingsSignals.push(distroLogoSignal);
         
         // Visibility changes - derive keys from visibility map to avoid duplication
         Object.values(this._visibilityMap).forEach(key => {
@@ -601,7 +799,6 @@ export default class WallpaperInfoExtension extends Extension {
         }
         
         this._logoContainer = null;
-        this._distroLogoContainer = null;
         this._osReleaseInfo = null;
         this._infoItems = [];
         this._settings = null;
