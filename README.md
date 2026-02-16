@@ -2,7 +2,7 @@
 
 A GNOME Shell extension that displays system information overlaid on your desktop wallpaper.
 
-**Last Updated:** Monday, 16 February 2026
+![Wallpaper Information Screenshot](Screenshot.png)
 
 ## Description
 
