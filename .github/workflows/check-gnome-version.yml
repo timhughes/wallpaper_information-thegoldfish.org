@@ -1,0 +1,39 @@
+name: Check for new GNOME version
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Daily at midnight UTC
+  workflow_dispatch: # Allow manual trigger for testing
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Check GNOME version
+        id: check
+        run: python scripts/check_gnome_version.py
+
+      - name: Create Issue if new version found
+        if: steps.check.outputs.new_version_found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST_VERSION: ${{ steps.check.outputs.latest_version }}
+        run: |
+          # Check if an open issue already exists for this version to avoid duplicates
+          existing_issue=$(gh issue list --search "Update support for GNOME $LATEST_VERSION in title" --state open --json number --jq '.[0].number')
+          
+          if [ -z "$existing_issue" ]; then
+            gh issue create --title "Update support for GNOME $LATEST_VERSION" --body "A new version of GNOME ($LATEST_VERSION) has been detected on GitLab. Please update \`metadata.json\` and verify compatibility with the new release." --label "enhancement"
+          else
+            echo "An open issue (#$existing_issue) already exists for GNOME $LATEST_VERSION."
+          fi
