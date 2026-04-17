@@ -13,6 +13,6 @@
   "url": "https://github.com/thegoldfish/wallpaper_information-thegoldfish.org",
   "settings-schema": "org.gnome.shell.extensions.wallpaper-information",
   "gettext-domain": "wallpaper_information",
-  "version": 1,
+  "version": 2,
   "version-name": "0.1.0"
 }
