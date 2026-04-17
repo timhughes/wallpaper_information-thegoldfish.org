@@ -1,7 +1,7 @@
 {
   "uuid": "wallpaper_information@thegoldfish.org",
   "name": "Wallpaper Information",
-  "description": "Displays system information overlayed on the desktop of the primary monitor",
+  "description": "Displays hardware, system, and network information as a desktop overlay.",
   "shell-version": [
     "45",
     "46",
@@ -14,5 +14,5 @@
   "settings-schema": "org.gnome.shell.extensions.wallpaper-information",
   "gettext-domain": "wallpaper_information",
   "version": 2,
-  "version-name": "0.1.0"
+  "version-name": "0.1.1"
 }
