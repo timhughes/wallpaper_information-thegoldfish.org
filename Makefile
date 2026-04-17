@@ -10,7 +10,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(VENV)/bin/pip
 SHEXLI = $(VENV)/bin/shexli
 
-.PHONY: all clean lint test pack install setup test-nested install-hooks bump
+.PHONY: all clean lint test pack install setup test-nested install-hooks bump validate-version
 
 all: pack lint test
 
@@ -21,6 +21,7 @@ bump:
 	jq ".version = $$NEW_VERSION" metadata.json > metadata.json.tmp && mv metadata.json.tmp metadata.json; \
 	git add metadata.json; \
 	echo "Version bumped to $$NEW_VERSION and staged."; \
+	echo "Remember to update 'version-name' in metadata.json if needed."; \
 	echo "Run: git commit -m \"release: v$$NEW_VERSION\" && git tag v$$NEW_VERSION && git push origin master --tags"
 
 # Set up virtual environment and install shexli
@@ -40,7 +41,6 @@ install-hooks:
 	@echo "Hooks installed: pre-commit (linting) and pre-push (tag version check)"
 
 # Run unit tests using jasmine (GJS)
-# This requires jasmine-gjs to be installed on your system.
 test:
 	@if [ -f "/usr/libexec/jasmine-gjs/jasmine-runner" ]; then \
 		echo "Running Jasmine GJS unit tests..."; \
@@ -75,13 +75,14 @@ validate-version:
 		exit 1; \
 	fi
 	@echo "Version validation passed (metadata: $(VERSION))"
+
 # Create the extension package for EGO/Manual installation
 pack:
 	@echo "Packaging extension into $(PACKAGE)..."
+	@rm -f "$(PACKAGE)"
 	@zip -r "$(PACKAGE)" . \
 		-i "*.js" "*.json" "*.css" "*.xml" "*.svg" "*.png" "LICENSE" "icons/*" \
 		-x "$(VENV)/*" \
-...
 		-x "*.git*" \
 		-x "*.github*" \
 		-x "scripts/*" \
