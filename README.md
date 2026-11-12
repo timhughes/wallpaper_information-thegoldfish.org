@@ -14,17 +14,17 @@ Displays system information overlayed on the desktop of the primary monitor.
 - Displays network IP addresses
 - Customizable position, font, colors, and background
 - Supports custom or distribution logos
-- GNOME 45–50 compatible (Wayland-native)
+- GNOME 45–51 compatible (Wayland-native)
 
 ## Installation
 
 ### Manual Installation
-1.  Download the latest release `.zip` from the [GitHub Releases](https://github.com/thegoldfish/wallpaper_information-thegoldfish.org/releases) page.
+1.  Download the latest release `.zip` from the [GitHub Releases](https://github.com/timhughes/wallpaper_information-thegoldfish.org/releases) page.
 2.  Install it using the GNOME Extensions CLI (replace <VERSION> with the actual version):
     ```bash
     gnome-extensions install --force wallpaper_information@thegoldfish.org.v<VERSION>.zip
     ```
-3.  Restart GNOME Shell (Alt+F2, r) or log out and back in.
+3.  Log out and back in (or press `Alt+F2`, `r` on X11) to reload GNOME Shell.
 4.  Enable the extension using the "Extensions" app or:
     ```bash
     gnome-extensions enable wallpaper_information@thegoldfish.org
@@ -38,10 +38,13 @@ Displays system information overlayed on the desktop of the primary monitor.
 - **zip** (for packaging)
 - **jasmine-gjs** (for unit testing)
 - **shexli** (for static analysis)
+- **mutter-devkit** (for manual nested GNOME Shell testing via `make test-nested` on GNOME 49+)
 
 #### Installing Dependencies (Fedora)
 ```bash
 sudo dnf install gjs jq zip
+# For manual nested GNOME Shell testing (GNOME 49+):
+sudo dnf install mutter-devkit
 # Install jasmine-gjs from GitHub Releases:
 # https://github.com/ptomato/jasmine-gjs/releases
 ```
@@ -63,7 +66,7 @@ The project includes a `Makefile` to automate common development tasks:
 - **`make test`**: Run the Jasmine GJS unit tests for the core logic.
 - **`make pack`**: Create a clean `.zip` package for distribution.
 - **`make install`**: Package and install the extension to your local system.
-- **`make test-nested`**: Launch a nested GNOME Shell instance for safe integration testing.
+- **`make test-nested`**: Launch a nested GNOME Shell instance for safe manual integration testing (requires `mutter-devkit` on GNOME 49+).
 - **`make clean`**: Remove build artifacts and the virtual environment.
 
 ### Project Structure

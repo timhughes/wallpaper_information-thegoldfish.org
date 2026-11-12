@@ -121,7 +121,7 @@
     <key name="font-color" type="s">
       <default>"#ffffff"</default>
       <summary>Font color</summary>
-      <description>Font color in hex format</description>
+      <description>Font color in hex or rgb/rgba format</description>
     </key>
     
     <key name="background-color" type="s">

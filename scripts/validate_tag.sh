@@ -6,7 +6,7 @@
 get_metadata_field() {
     local commit=$1
     local field=$2
-    git show "${commit}:metadata.json" 2>/dev/null | jq -r ".${field}"
+    git show "${commit}:metadata.json" 2>/dev/null | jq -r ".\"${field}\""
 }
 
 # Read stdin to see if any tags are being pushed

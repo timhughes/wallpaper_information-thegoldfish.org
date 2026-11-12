@@ -1,33 +1,33 @@
 
 .infobox-container {
-    font-size: 24px;
-    font-weight: bold;
+    font-size: 14px;
     color: #ffffff;
     background-color: rgba(10,10,10,0.5);
     border-radius: 10px;
     padding: 12px;
 }
 
-.info-row {
+.infobox-container .info-row {
     margin-bottom: 4px;
 }
 
-.info-row:last-child {
+.infobox-container .info-row:last-child {
     margin-bottom: 0;
 }
 
-.info-label {
+.infobox-container .info-label {
+    font-weight: bold;
     margin-right: 12px;
 }
 
-.info-values-container {
+.infobox-container .info-values-container {
     /* Container for one or more values */
 }
 
-.info-value {
-    /* Individual value labels */
+.infobox-container .info-value {
+    font-weight: normal;
 }
 
-.logo-container {
+.infobox-container .logo-container {
     margin-bottom: 12px;
 }

@@ -81,7 +81,7 @@ pack:
 	@echo "Packaging extension into $(PACKAGE)..."
 	@rm -f "$(PACKAGE)"
 	@zip -r "$(PACKAGE)" . \
-		-i "*.js" "*.json" "*.css" "*.xml" "*.svg" "*.png" "LICENSE" "icons/*" \
+		-i "*.js" "*.json" "*.css" "*.xml" "LICENSE" \
 		-x "$(VENV)/*" \
 		-x "*.git*" \
 		-x "*.github*" \
@@ -90,6 +90,7 @@ pack:
 		-x "schemas/gschemas.compiled" \
 		-x "README.md" \
 		-x "Screenshot.png" \
+		-x "logo.png" \
 		-x ".gitignore" \
 		-x ".pre-commit-config.yaml" \
 		-x "Makefile" \
@@ -99,13 +100,17 @@ pack:
 install: pack
 	@echo "Installing extension locally..."
 	@gnome-extensions install --force "$(PACKAGE)"
-	@echo "Extension installed. Restart GNOME Shell (Alt+F2, r) or log out/in to apply."
+	@echo "Extension installed. Log out and back in (or Alt+F2, r on X11) to apply."
 
 # Run integration tests in a nested GNOME Shell instance
 test-nested: install
 	@echo "Starting nested GNOME Shell for testing..."
 	@echo "Tip: To view logs, run this in another terminal: journalctl -f -o cat /usr/bin/gnome-shell"
-	@dbus-run-session gnome-shell --nested --wayland
+	@if gnome-shell --help 2>/dev/null | grep -q -- '--devkit'; then \
+		dbus-run-session gnome-shell --devkit --wayland; \
+	else \
+		dbus-run-session gnome-shell --nested --wayland; \
+	fi
 
 # Clean up build artifacts
 clean:

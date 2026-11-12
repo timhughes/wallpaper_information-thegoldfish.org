@@ -10,12 +10,14 @@ import Adw from 'gi://Adw';
 import Gtk from 'gi://Gtk';
 import Gio from 'gi://Gio';
 import Gdk from 'gi://Gdk';
+import GObject from 'gi://GObject';
 import Pango from 'gi://Pango';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 export default class WallpaperInfoPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
-        const settings = this.getSettings('org.gnome.shell.extensions.wallpaper-information');
+        window.search_enabled = true;
+        const settings = this.getSettings();
         
         // Appearance Page (Combined Position and Appearance)
         const appearancePage = new Adw.PreferencesPage({
@@ -42,12 +44,14 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         verticalModel.append('Bottom');
         verticalRow.model = verticalModel;
         
+        const verticalOptions = ['top', 'middle', 'bottom'];
         const verticalPos = settings.get_string('position-vertical');
-        verticalRow.selected = ['top', 'middle', 'bottom'].indexOf(verticalPos);
+        verticalRow.selected = Math.max(0, verticalOptions.indexOf(verticalPos));
         
         verticalRow.connect('notify::selected', (widget) => {
-            const selected = ['top', 'middle', 'bottom'][widget.selected];
-            settings.set_string('position-vertical', selected);
+            const selected = verticalOptions[widget.selected];
+            if (selected)
+                settings.set_string('position-vertical', selected);
         });
         positionGroup.add(verticalRow);
         
@@ -62,12 +66,14 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         horizontalModel.append('Right');
         horizontalRow.model = horizontalModel;
         
+        const horizontalOptions = ['left', 'center', 'right'];
         const horizontalPos = settings.get_string('position-horizontal');
-        horizontalRow.selected = ['left', 'center', 'right'].indexOf(horizontalPos);
+        horizontalRow.selected = Math.max(0, horizontalOptions.indexOf(horizontalPos));
         
         horizontalRow.connect('notify::selected', (widget) => {
-            const selected = ['left', 'center', 'right'][widget.selected];
-            settings.set_string('position-horizontal', selected);
+            const selected = horizontalOptions[widget.selected];
+            if (selected)
+                settings.set_string('position-horizontal', selected);
         });
         positionGroup.add(horizontalRow);
         
@@ -97,16 +103,18 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
 
         fontButton.connect('notify::font-desc', () => {
             const desc = fontButton.font_desc;
+            if (!desc)
+                return;
             const family = desc.get_family();
-            const size = desc.get_size() / Pango.SCALE;
+            const size = Math.max(8, Math.min(72, Math.round(desc.get_size() / Pango.SCALE)));
             
             if (family)
                 settings.set_string('font-family', family);
-            if (size > 0)
-                settings.set_int('font-size', size);
+            settings.set_int('font-size', size);
         });
 
         fontRow.add_suffix(fontButton);
+        fontRow.activatable_widget = fontButton;
         fontGroup.add(fontRow);
         
         // Font color
@@ -135,6 +143,7 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         });
 
         fontColorRow.add_suffix(fontColorButton);
+        fontColorRow.activatable_widget = fontColorButton;
         fontGroup.add(fontColorRow);
         
         // Background Settings Group
@@ -170,6 +179,7 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         });
 
         bgColorRow.add_suffix(bgColorButton);
+        bgColorRow.activatable_widget = bgColorButton;
         bgGroup.add(bgColorRow);
         
         // Border radius
@@ -207,36 +217,54 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         });
         window.add(infoPage);
         
-        const infoGroup = new Adw.PreferencesGroup({
-            title: 'Information Items',
-            description: 'Choose which information to display'
-        });
-        infoPage.add(infoGroup);
-        
-        // Toggle switches for each information item
-        const items = [
-            { key: 'show-distro-name', title: 'Distribution Name', subtitle: 'Display the Linux distribution name' },
-            { key: 'show-distro-version', title: 'Distribution Version', subtitle: 'Display the Linux distribution version' },
-            { key: 'show-hostname', title: 'Hostname', subtitle: 'Display the system hostname' },
-            { key: 'show-boot-time', title: 'Boot Time', subtitle: 'Display when the system was last booted' },
-            { key: 'show-kernel', title: 'Kernel Version', subtitle: 'Display the Linux kernel version' },
-            { key: 'show-hardware-vendor', title: 'Hardware Vendor', subtitle: 'Display the hardware manufacturer' },
-            { key: 'show-hardware-model', title: 'Hardware Model', subtitle: 'Display the hardware model name' },
-            { key: 'show-firmware-version', title: 'Firmware Version', subtitle: 'Display the BIOS/UEFI firmware version' },
-            { key: 'show-os-support-end', title: 'OS Support End', subtitle: 'Display when the OS support ends' },
-            { key: 'show-os-support-remaining', title: 'OS Support Remaining', subtitle: 'Display time remaining for OS support' },
-            { key: 'show-asset-tag', title: 'Asset Tag', subtitle: 'Display the chassis asset tag' },
-            { key: 'show-serial-number', title: 'Serial Number', subtitle: 'Display the system serial number' },
-            { key: 'show-ip-address', title: 'IP Address', subtitle: 'Display network IP addresses' }
+        const infoGroups = [
+            {
+                title: 'System',
+                description: 'Operating system and runtime details',
+                items: [
+                    { key: 'show-distro-name', title: 'Distribution Name', subtitle: 'Display the Linux distribution name' },
+                    { key: 'show-distro-version', title: 'Distribution Version', subtitle: 'Display the Linux distribution version' },
+                    { key: 'show-hostname', title: 'Hostname', subtitle: 'Display the system hostname' },
+                    { key: 'show-boot-time', title: 'Boot Time', subtitle: 'Display when the system was last booted' },
+                    { key: 'show-kernel', title: 'Kernel Version', subtitle: 'Display the Linux kernel version' },
+                    { key: 'show-os-support-end', title: 'OS Support End', subtitle: 'Display when the OS support ends' },
+                    { key: 'show-os-support-remaining', title: 'OS Support Remaining', subtitle: 'Display time remaining for OS support' }
+                ]
+            },
+            {
+                title: 'Hardware',
+                description: 'Device and firmware identifiers',
+                items: [
+                    { key: 'show-hardware-vendor', title: 'Hardware Vendor', subtitle: 'Display the hardware manufacturer' },
+                    { key: 'show-hardware-model', title: 'Hardware Model', subtitle: 'Display the hardware model name' },
+                    { key: 'show-firmware-version', title: 'Firmware Version', subtitle: 'Display the BIOS/UEFI firmware version' },
+                    { key: 'show-asset-tag', title: 'Asset Tag', subtitle: 'Display the chassis asset tag' },
+                    { key: 'show-serial-number', title: 'Serial Number', subtitle: 'Display the system serial number' }
+                ]
+            },
+            {
+                title: 'Network',
+                description: 'Network connectivity information',
+                items: [
+                    { key: 'show-ip-address', title: 'IP Address', subtitle: 'Display network IP addresses' }
+                ]
+            }
         ];
-        
-        items.forEach(item => {
-            const row = new Adw.SwitchRow({
-                title: item.title,
-                subtitle: item.subtitle
+
+        infoGroups.forEach(groupDef => {
+            const group = new Adw.PreferencesGroup({
+                title: groupDef.title,
+                description: groupDef.description
             });
-            settings.bind(item.key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
-            infoGroup.add(row);
+            groupDef.items.forEach(item => {
+                const row = new Adw.SwitchRow({
+                    title: item.title,
+                    subtitle: item.subtitle
+                });
+                settings.bind(item.key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
+                group.add(row);
+            });
+            infoPage.add(group);
         });
         
         // Logo Page
@@ -261,60 +289,69 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         logoGroup.add(showLogoRow);
         
         // Logo path
+        const defaultLogoSubtitle = 'Override distribution logo with a custom image';
         const logoPathRow = new Adw.ActionRow({
             title: 'Custom Logo',
-            subtitle: 'Override distribution logo with a custom image'
+            subtitle: defaultLogoSubtitle,
+            use_markup: false
         });
         
         const logoButton = new Gtk.Button({
             label: 'Choose File',
             valign: Gtk.Align.CENTER
         });
+
+        const currentLogoPath = settings.get_string('logo-path');
+        const clearButton = new Gtk.Button({
+            icon_name: 'edit-clear-symbolic',
+            valign: Gtk.Align.CENTER,
+            css_classes: ['flat'],
+            tooltip_text: 'Reset to distribution logo',
+            sensitive: Boolean(currentLogoPath)
+        });
         
         logoButton.connect('clicked', () => {
-            const dialog = new Gtk.FileChooserDialog({
-                title: 'Select Logo Image',
-                action: Gtk.FileChooserAction.OPEN,
-                transient_for: window,
-                modal: true
-            });
-            
-            dialog.add_button('Cancel', Gtk.ResponseType.CANCEL);
-            dialog.add_button('Open', Gtk.ResponseType.ACCEPT);
-            
             const filter = new Gtk.FileFilter();
             filter.set_name('Image Files');
             filter.add_mime_type('image/png');
             filter.add_mime_type('image/jpeg');
             filter.add_mime_type('image/svg+xml');
-            dialog.add_filter(filter);
-            
-            dialog.connect('response', (dialog, response) => {
-                if (response === Gtk.ResponseType.ACCEPT) {
-                    const file = dialog.get_file();
-                    const path = file.get_path();
-                    settings.set_string('logo-path', path);
-                    logoPathRow.subtitle = path;
-                }
-                dialog.destroy();
+
+            const filters = new Gio.ListStore({item_type: Gtk.FileFilter});
+            filters.append(filter);
+
+            const dialog = new Gtk.FileDialog({
+                title: 'Select Logo Image',
+                modal: true,
+                filters,
+                default_filter: filter
             });
-            
-            dialog.show();
+
+            dialog.open(window, null, (dlg, res) => {
+                try {
+                    const file = dlg.open_finish(res);
+                    const path = file?.get_path();
+                    if (path) {
+                        settings.set_string('logo-path', path);
+                        logoPathRow.subtitle = path;
+                        clearButton.sensitive = true;
+                    }
+                } catch (e) {
+                    if (!e.matches?.(Gtk.DialogError, Gtk.DialogError.DISMISSED))
+                        console.error(`Failed to select logo file: ${e.message}`);
+                }
+            });
         });
 
-        const clearButton = new Gtk.Button({
-            icon_name: 'edit-clear-symbolic',
-            valign: Gtk.Align.CENTER
-        });
         clearButton.connect('clicked', () => {
             settings.set_string('logo-path', '');
-            logoPathRow.subtitle = 'Override distribution logo with a custom image';
+            logoPathRow.subtitle = defaultLogoSubtitle;
+            clearButton.sensitive = false;
         });
         
         logoPathRow.add_suffix(logoButton);
         logoPathRow.add_suffix(clearButton);
         
-        const currentLogoPath = settings.get_string('logo-path');
         if (currentLogoPath) {
             logoPathRow.subtitle = currentLogoPath;
         }
@@ -360,13 +397,19 @@ export default class WallpaperInfoPreferences extends ExtensionPreferences {
         logoAlignModel.append('Right');
         logoAlignRow.model = logoAlignModel;
         
+        const logoAlignOptions = ['left', 'center', 'right'];
         const logoAlign = settings.get_string('logo-alignment');
-        logoAlignRow.selected = ['left', 'center', 'right'].indexOf(logoAlign);
+        logoAlignRow.selected = Math.max(0, logoAlignOptions.indexOf(logoAlign));
         
         logoAlignRow.connect('notify::selected', (widget) => {
-            const selected = ['left', 'center', 'right'][widget.selected];
-            settings.set_string('logo-alignment', selected);
+            const selected = logoAlignOptions[widget.selected];
+            if (selected)
+                settings.set_string('logo-alignment', selected);
         });
         logoGroup.add(logoAlignRow);
+
+        [logoPathRow, logoSizeRow, logoBorderRadiusRow, logoAlignRow].forEach(row => {
+            showLogoRow.bind_property('active', row, 'sensitive', GObject.BindingFlags.SYNC_CREATE);
+        });
     }
 }
